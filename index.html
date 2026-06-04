@@ -7,6 +7,8 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <link rel="manifest" href="manifest.json">
     <title>Shared Calendar</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📅</text></svg>">
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
     <style>
         :root {
@@ -626,9 +628,10 @@
                 }
             });
 
-            // ② 横スワイプで月を切り替える処理
+            // ② 横スワイプで月を切り替える処理（なめらかアニメーション付き）
             let touchStartX = 0;
             let touchStartY = 0;
+            const calendarEl = document.getElementById('calendar');
             const wrapperEl = document.getElementById('calendar-wrapper');
 
             wrapperEl.addEventListener('touchstart', e => {
@@ -642,10 +645,32 @@
                 let xDiff = touchStartX - touchEndX;
                 let yDiff = touchStartY - touchEndY;
 
-                // 縦（スクロール）よりも横の移動が大きく、かつ50px以上動かした場合のみ発動
+                // 縦より横の移動が大きく、かつ50px以上動かした場合
                 if (Math.abs(xDiff) > Math.abs(yDiff) && Math.abs(xDiff) > 50) {
-                    if (xDiff > 0) calendar.next(); // 左スワイプ -> 翌月
-                    else calendar.prev();           // 右スワイプ -> 前月
+
+                    // 1. スワイプした方向へスライドしながらフェードアウト
+                    calendarEl.style.transition = 'transform 0.15s ease-in, opacity 0.15s ease-in';
+                    calendarEl.style.opacity = '0';
+                    calendarEl.style.transform = xDiff > 0 ? 'translateX(-30px)' : 'translateX(30px)';
+
+                    // 2. 少し待ってから月を切り替え、逆側からスライドイン
+                    setTimeout(() => {
+                        if (xDiff > 0) calendar.next(); // 左スワイプ -> 翌月
+                        else calendar.prev();           // 右スワイプ -> 前月
+
+                        // 逆側に瞬間移動させる（アニメーションなし）
+                        calendarEl.style.transition = 'none';
+                        calendarEl.style.transform = xDiff > 0 ? 'translateX(30px)' : 'translateX(-30px)';
+
+                        // 3. 元の位置へなめらかに戻す
+                        requestAnimationFrame(() => {
+                            requestAnimationFrame(() => {
+                                calendarEl.style.transition = 'transform 0.25s ease-out, opacity 0.25s ease-out';
+                                calendarEl.style.opacity = '1';
+                                calendarEl.style.transform = 'translateX(0)';
+                            });
+                        });
+                    }, 150); // フェードアウトを待つ時間
                 }
             }, { passive: true });
 

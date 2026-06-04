@@ -1,859 +1,505 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <link rel="manifest" href="manifest.json">
-    <title>Shared Calendar</title>
-    <link rel="icon"
-        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📅</text></svg>">
-    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
-    <style>
-        :root {
-            --primary: #007aff;
-            --bg-color: #f2f2f7;
-            --surface: #ffffff;
-            --text-main: #1c1c1e;
-            --border: #e5e5ea;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📅</text></svg>">
+  
+  <title>Shared Calendar</title>
+  <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+  
+  <style>
+    /* 全体のデザイン・カラー設定 */
+    :root {
+      --primary: #007aff;
+      --bg-color: #f2f2f7;
+      --surface: #ffffff;
+      --text-main: #1c1c1e;
+      --border: #e5e5ea;
+    }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            margin: 0;
-            padding: 0;
-            background: var(--bg-color);
-            color: var(--text-main);
-            overscroll-behavior-y: none;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 0; background: var(--bg-color); color: var(--text-main); overscroll-behavior-y: none; height: 100vh; display: flex; flex-direction: column; }
+    
+    /* 天気ウィジェット */
+    #weather-widget-container { background: var(--bg-color); padding: env(safe-area-inset-top) 0 4px 0; border-bottom: 1px solid var(--border); }
+    #weather-widget { display: flex; overflow-x: auto; gap: 8px; padding: 4px 12px 12px 12px; scrollbar-width: none; min-height: 70px; }
+    #weather-widget::-webkit-scrollbar { display: none; }
+    .weather-day { background: var(--surface); padding: 8px; border-radius: 12px; min-width: 45px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.03); flex-shrink: 0; }
+    .w-day { font-size: 11px; color: #86868b; margin-bottom: 2px; font-weight: bold; }
+    .w-icon { font-size: 18px; margin-bottom: 2px; }
+    .w-temp { font-size: 10px; display: flex; justify-content: center; gap: 4px; }
+    .w-temp .max { color: #ff3b30; }
+    .w-temp .min { color: #007aff; }
 
-        /* 天気ウィジェット（見えなくなる問題を修正） */
-        #weather-widget-container {
-            background: var(--bg-color);
-            padding: env(safe-area-inset-top) 0 4px 0;
-            border-bottom: 1px solid var(--border);
-        }
+    /* 読み込み中インジケータ */
+    #loading-spinner { display: none; text-align: center; font-size: 12px; color: white; background: var(--primary); padding: 4px; font-weight: bold; }
 
-        #weather-location {
-            font-size: 11px;
-            color: #86868b;
-            font-weight: bold;
-            margin: 8px 12px 4px 12px;
-        }
+    /* カレンダーエリア */
+    #calendar-wrapper { flex: 1; padding: 12px 12px calc(env(safe-area-inset-bottom) + 160px) 12px; overflow-y: auto; overflow-x: hidden; }
+    #calendar { max-width: 100%; margin: 0 auto; background: var(--surface); padding: 6px; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
+    .fc .fc-toolbar-title { font-size: 1.2em !important; font-weight: bold; letter-spacing: 1px; cursor: pointer; color: var(--primary); }
+    .fc .fc-button-primary { background-color: var(--primary) !important; border: none !important; border-radius: 8px !important; }
+    .fc-theme-standard td, .fc-theme-standard th { border-color: var(--border); }
+    
+    .fc-daygrid-day-frame { min-height: 70px; }
+    .fc-event { border-radius: 6px !important; border: none !important; font-weight: 500; padding: 2px 4px; overflow: hidden; white-space: normal !important; font-size: 11px; line-height: 1.2; }
+    .fc-day-sat { background-color: #f4f8ff !important; }
+    .fc-day-sun { background-color: #fff0f0 !important; }
 
-        #weather-widget {
-            display: flex;
-            overflow-x: auto;
-            gap: 8px;
-            padding: 4px 12px 12px 12px;
-            scrollbar-width: none;
-            min-height: 70px;
-        }
+    /* スマート検索バー ＆ インライン結果 */
+    .search-wrapper { position: fixed; bottom: calc(env(safe-area-inset-bottom) + 12px); left: 12px; right: 12px; z-index: 800; display: flex; flex-direction: column; gap: 8px; }
+    #inline-search-result { display: none; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); padding: 16px; border-radius: 16px; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); font-size: 14px; max-height: 250px; overflow-y: auto; line-height: 1.5; }
+    .search-bar-container { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); padding: 8px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 8px; }
+    .search-bar-container input { flex: 1; border: none; background: #f2f2f7; padding: 12px 16px; border-radius: 12px; font-size: 16px; outline: none; }
+    .search-btn { background: var(--primary); color: white; border: none; border-radius: 12px; padding: 0 16px; font-weight: bold; cursor: pointer; height: 44px; display: flex; align-items: center; justify-content: center; }
+    
+    /* 右下の＋ボタン */
+    .fab { position: fixed; bottom: calc(env(safe-area-inset-bottom) + 85px); right: 20px; width: 56px; height: 56px; background-color: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; box-shadow: 0 4px 16px rgba(0, 122, 255, 0.4); z-index: 900; cursor: pointer; }
+    
+    /* 汎用オーバーレイ（モーダル用） */
+    .overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 1000; align-items: flex-end; justify-content: center; backdrop-filter: blur(2px); }
+    
+    /* 予定詳細モーダル */
+    #detail-container { background: var(--surface); width: 90%; max-width: 400px; padding: 24px; border-radius: 20px; margin-bottom: 20vh; box-shadow: 0 10px 40px rgba(0,0,0,0.2); transform: scale(0.95); transition: 0.2s; opacity: 0; }
+    #detail-overlay.show #detail-container { transform: scale(1); opacity: 1; }
+    #detail-title { margin: 0 0 8px 0; font-size: 20px; font-weight: bold; }
+    #detail-time { color: var(--primary); font-size: 14px; margin-bottom: 16px; font-weight: bold; }
+    #detail-memo { background: #f2f2f7; padding: 12px; border-radius: 12px; font-size: 14px; white-space: pre-wrap; margin-bottom: 20px; min-height: 40px; }
+    
+    /* 入力フォーム（ボトムシート） */
+    #form-container { background: var(--surface); width: 100%; max-width: 500px; padding: 20px 24px calc(env(safe-area-inset-bottom) + 24px) 24px; box-sizing: border-box; border-radius: 24px 24px 0 0; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.1, 0.8, 0.2, 1); }
+    #form-overlay.show #form-container { transform: translateY(0); }
+    .drag-handle { width: 40px; height: 5px; background: #e5e5ea; border-radius: 3px; margin: 0 auto 16px auto; }
+    
+    .input-group { margin-bottom: 16px; width: 100%; box-sizing: border-box; }
+    .input-group label { display: block; font-size: 13px; color: #86868b; margin-bottom: 6px; font-weight: bold; }
+    input[type="text"], input[type="datetime-local"], input[type="date"], textarea { width: 100%; padding: 14px; border: none; background: #f2f2f7; border-radius: 12px; box-sizing: border-box; font-size: 16px; outline: none; }
+    textarea { resize: none; height: 80px; }
+    
+    .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .toggle-switch { position: relative; width: 50px; height: 30px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e5e5ea; transition: .3s; border-radius: 30px; }
+    .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    input:checked + .slider { background-color: #34c759; }
+    input:checked + .slider:before { transform: translateX(20px); }
 
-        #weather-widget::-webkit-scrollbar {
-            display: none;
-        }
-
-        .weather-day {
-            background: var(--surface);
-            padding: 8px;
-            border-radius: 12px;
-            min-width: 45px;
-            text-align: center;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
-            flex-shrink: 0;
-        }
-
-        .w-day {
-            font-size: 11px;
-            color: #86868b;
-            margin-bottom: 2px;
-            font-weight: bold;
-        }
-
-        .w-icon {
-            font-size: 18px;
-            margin-bottom: 2px;
-        }
-
-        .w-temp {
-            font-size: 10px;
-            display: flex;
-            justify-content: center;
-            gap: 4px;
-        }
-
-        .w-temp .max {
-            color: #ff3b30;
-        }
-
-        .w-temp .min {
-            color: #007aff;
-        }
-
-        /* 読み込み中インジケータ */
-        #loading-spinner {
-            display: none;
-            text-align: center;
-            font-size: 12px;
-            color: white;
-            background: var(--primary);
-            padding: 4px;
-            font-weight: bold;
-        }
-
-        /* カレンダーエリア */
-        #calendar-wrapper {
-            flex: 1;
-            padding: 12px 12px calc(env(safe-area-inset-bottom) + 160px) 12px;
-            overflow-y: auto;
-        }
-
-        #calendar {
-            max-width: 100%;
-            margin: 0 auto;
-            background: var(--surface);
-            padding: 6px;
-            border-radius: 16px;
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-        }
-
-        .fc .fc-toolbar-title {
-            font-size: 1.2em !important;
-            font-weight: bold;
-            letter-spacing: 1px;
-            cursor: pointer;
-            color: var(--primary);
-        }
-
-        .fc .fc-toolbar-title:active {
-            opacity: 0.6;
-        }
-
-        .fc .fc-button-primary {
-            background-color: var(--primary) !important;
-            border: none !important;
-            border-radius: 8px !important;
-        }
-
-        .fc-theme-standard td,
-        .fc-theme-standard th {
-            border-color: var(--border);
-        }
-
-        /* 縦幅を広げ、タイトルを折り返す */
-        .fc-daygrid-day-frame {
-            min-height: 70px;
-        }
-
-        .fc-event {
-            border-radius: 6px !important;
-            border: none !important;
-            font-weight: 500;
-            padding: 2px 4px;
-            overflow: hidden;
-            white-space: normal !important;
-            font-size: 11px;
-            line-height: 1.2;
-        }
-
-        .fc-day-sat {
-            background-color: #f4f8ff !important;
-        }
-
-        .fc-day-sun {
-            background-color: #fff0f0 !important;
-        }
-
-        /* AI検索バー ＆ インライン結果（検索バーの上に出現） */
-        .search-wrapper {
-            position: fixed;
-            bottom: calc(env(safe-area-inset-bottom) + 12px);
-            left: 12px;
-            right: 12px;
-            z-index: 800;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        #inline-search-result {
-            display: none;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            padding: 16px;
-            border-radius: 16px;
-            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
-            font-size: 14px;
-            max-height: 250px;
-            overflow-y: auto;
-            line-height: 1.5;
-        }
-
-        .search-bar-container {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            padding: 8px;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .search-bar-container input {
-            flex: 1;
-            border: none;
-            background: #f2f2f7;
-            padding: 12px 16px;
-            border-radius: 12px;
-            font-size: 16px;
-            outline: none;
-        }
-
-        .search-btn {
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            padding: 0 16px;
-            font-weight: bold;
-            cursor: pointer;
-            height: 44px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 4px;
-        }
-
-        .search-btn:active {
-            transform: scale(0.95);
-        }
-
-        /* 右下の＋ボタン */
-        .fab {
-            position: fixed;
-            bottom: calc(env(safe-area-inset-bottom) + 85px);
-            right: 20px;
-            width: 56px;
-            height: 56px;
-            background-color: var(--primary);
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 32px;
-            box-shadow: 0 4px 16px rgba(0, 122, 255, 0.4);
-            z-index: 900;
-            cursor: pointer;
-        }
-
-        /* 汎用オーバーレイ（ボトムシート＆詳細モーダル用） */
-        .overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.4);
-            z-index: 1000;
-            align-items: flex-end;
-            justify-content: center;
-            backdrop-filter: blur(2px);
-        }
-
-        /* 予定の詳細を見るモーダル */
-        #detail-container {
-            background: var(--surface);
-            width: 90%;
-            max-width: 400px;
-            padding: 24px;
-            border-radius: 20px;
-            margin-bottom: 20vh;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-            transform: scale(0.95);
-            transition: 0.2s;
-            opacity: 0;
-        }
-
-        #detail-overlay.show #detail-container {
-            transform: scale(1);
-            opacity: 1;
-        }
-
-        #detail-title {
-            margin: 0 0 8px 0;
-            font-size: 20px;
-            font-weight: bold;
-        }
-
-        #detail-time {
-            color: #007aff;
-            font-size: 14px;
-            margin-bottom: 16px;
-            font-weight: bold;
-        }
-
-        #detail-memo {
-            background: #f2f2f7;
-            padding: 12px;
-            border-radius: 12px;
-            font-size: 14px;
-            white-space: pre-wrap;
-            margin-bottom: 20px;
-            min-height: 40px;
-        }
-
-        /* ボトムシート（入力フォーム） */
-        #form-container {
-            background: var(--surface);
-            width: 100%;
-            max-width: 500px;
-            padding: 20px 24px calc(env(safe-area-inset-bottom) + 24px) 24px;
-            box-sizing: border-box;
-            border-radius: 24px 24px 0 0;
-            transform: translateY(100%);
-            transition: transform 0.3s cubic-bezier(0.1, 0.8, 0.2, 1);
-        }
-
-        #form-overlay.show #form-container {
-            transform: translateY(0);
-        }
-
-        .drag-handle {
-            width: 40px;
-            height: 5px;
-            background: #e5e5ea;
-            border-radius: 3px;
-            margin: 0 auto 16px auto;
-        }
-
-        /* 縦並びにして、くっつきを解消 */
-        .input-group {
-            margin-bottom: 16px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-
-        .input-group label {
-            display: block;
-            font-size: 13px;
-            color: #86868b;
-            margin-bottom: 6px;
-            font-weight: bold;
-        }
-
-        input[type="text"],
-        input[type="datetime-local"],
-        input[type="date"],
-        textarea {
-            width: 100%;
-            padding: 14px;
-            border: none;
-            background: #f2f2f7;
-            border-radius: 12px;
-            box-sizing: border-box;
-            font-size: 16px;
-            outline: none;
-        }
-
-        textarea {
-            resize: none;
-            height: 80px;
-        }
-
-        .toggle-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .toggle-switch {
-            position: relative;
-            width: 50px;
-            height: 30px;
-        }
-
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #e5e5ea;
-            transition: .3s;
-            border-radius: 30px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 26px;
-            width: 26px;
-            left: 2px;
-            bottom: 2px;
-            background-color: white;
-            transition: .3s;
-            border-radius: 50%;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        input:checked+.slider {
-            background-color: #34c759;
-        }
-
-        input:checked+.slider:before {
-            transform: translateX(20px);
-        }
-
-        .color-palette {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 24px;
-            padding: 0 8px;
-        }
-
-        .color-circle {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            cursor: pointer;
-            border: 3px solid transparent;
-            transition: 0.2s;
-        }
-
-        .color-circle.active {
-            transform: scale(1.1);
-            border-color: var(--text-main);
-        }
-
-        .btn-close {
-            width: 100%;
-            padding: 12px;
-            background: #e5e5ea;
-            border: none;
-            border-radius: 12px;
-            font-weight: bold;
-            font-size: 16px;
-            cursor: pointer;
-            color: #1c1c1e;
-        }
-
-        button.save {
-            width: 100%;
-            padding: 16px;
-            border: none;
-            border-radius: 14px;
-            font-size: 16px;
-            font-weight: bold;
-            background: var(--primary);
-            color: white;
-            cursor: pointer;
-        }
-    </style>
+    .color-palette { display: flex; justify-content: space-between; margin-bottom: 24px; padding: 0 8px; }
+    .color-circle { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: 0.2s; }
+    .color-circle.active { transform: scale(1.1); border-color: var(--text-main); }
+    
+    .btn-close { width: 100%; padding: 12px; background: #e5e5ea; border: none; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; color: #1c1c1e; }
+    button.save { width: 100%; padding: 16px; border: none; border-radius: 14px; font-size: 16px; font-weight: bold; background: var(--primary); color: white; cursor: pointer; }
+  </style>
 </head>
-
 <body>
 
-    <div id="weather-widget-container">
-        <div id="weather-location">📍 札幌エリアの週間天気</div>
-        <div id="weather-widget">☁️ 天気情報を取得中...</div>
+  <div id="weather-widget-container">
+    <div id="weather-header" style="display: flex; justify-content: space-between; align-items: center; margin: 8px 12px 4px 12px;">
+      <div id="weather-location" style="font-size: 11px; color: #86868b; font-weight: bold; margin: 0;">📍 札幌エリアの天気</div>
+      <button onclick="getGPSWeather()" style="font-size: 11px; padding: 6px 10px; border-radius: 8px; border: none; background: var(--primary); color: white; font-weight: bold; cursor: pointer;">📍 現在地を取得</button>
     </div>
-    <div id="loading-spinner">🔄 カレンダーを同期中...</div>
+    <div id="weather-widget">☁️ 天気情報を取得中...</div>
+  </div>
+  
+  <div id="loading-spinner">🔄 カレンダーを同期中...</div>
 
-    <div id="calendar-wrapper">
-        <div id='calendar'></div>
+  <div id="calendar-wrapper">
+    <div id='calendar'></div>
+  </div>
+
+  <div class="fab" onclick="openForm()">＋</div>
+
+  <div class="search-wrapper">
+    <div id="inline-search-result">
+      <div id="search-content"></div>
+      <button class="btn-close" style="margin-top:16px;" onclick="document.getElementById('inline-search-result').style.display='none'">閉じる</button>
     </div>
-
-    <div class="fab" onclick="openForm()">＋</div>
-
-    <div class="search-wrapper">
-        <div id="inline-search-result">
-            <div id="search-content"></div>
-            <button class="btn-close" style="margin-top:16px;"
-                onclick="document.getElementById('inline-search-result').style.display='none'">閉じる</button>
-        </div>
-
-        <div class="search-bar-container">
-            <input type="text" id="main-search" placeholder="AIに質問する..."
-                onkeypress="if(event.key==='Enter') executeAISearch()">
-            <button class="search-btn" onclick="executeAISearch()">✨ AI</button>
-        </div>
+    <div class="search-bar-container">
+      <input type="text" id="main-search" placeholder="言葉や場所を調べる..." onkeypress="if(event.key==='Enter') executeAISearch()">
+      <button class="search-btn" onclick="executeAISearch()">✨ 検索</button>
     </div>
+  </div>
 
-    <div id="detail-overlay" class="overlay" onclick="closeDetail(event)">
-        <div id="detail-container" onclick="event.stopPropagation()">
-            <h2 id="detail-title">タイトル</h2>
-            <div id="detail-time">時間</div>
-            <label style="font-size:12px; color:#86868b; font-weight:bold;">📝 メモ</label>
-            <div id="detail-memo"></div>
-            <button class="btn-close" onclick="closeDetail()">閉じる</button>
-        </div>
+  <div id="detail-overlay" class="overlay" onclick="closeDetail(event)">
+    <div id="detail-container" onclick="event.stopPropagation()">
+      <h2 id="detail-title">タイトル</h2>
+      <div id="detail-time">時間</div>
+      <label style="font-size:12px; color:#86868b; font-weight:bold;">📝 メモ</label>
+      <div id="detail-memo"></div>
+      <button class="btn-close" onclick="closeDetail()">閉じる</button>
     </div>
+  </div>
 
-    <div id="form-overlay" class="overlay" style="align-items: flex-end;" onclick="closeForm(event)">
-        <div id="form-container" onclick="event.stopPropagation()">
-            <div class="drag-handle"></div>
+  <div id="form-overlay" class="overlay" style="align-items: flex-end;" onclick="closeForm(event)">
+    <div id="form-container" onclick="event.stopPropagation()">
+      <div class="drag-handle"></div>
+      
+      <div class="input-group">
+        <label>タイトル</label>
+        <input type="text" id="event-title" placeholder="予定を入力">
+      </div>
 
-            <div class="input-group">
-                <label>タイトル</label>
-                <input type="text" id="event-title" placeholder="デート、内見など">
-            </div>
+      <div class="toggle-row">
+        <label style="font-size: 16px; font-weight:bold;">終日</label>
+        <label class="toggle-switch"><input type="checkbox" id="all-day-toggle" onchange="toggleAllDay()"><span class="slider"></span></label>
+      </div>
+      
+      <div class="input-group">
+        <label>開始</label>
+        <input type="datetime-local" id="event-start">
+      </div>
+      <div class="input-group">
+        <label>終了</label>
+        <input type="datetime-local" id="event-end">
+      </div>
 
-            <div class="toggle-row">
-                <label style="font-size: 16px; font-weight:bold;">終日</label>
-                <label class="toggle-switch"><input type="checkbox" id="all-day-toggle" onchange="toggleAllDay()"><span
-                        class="slider"></span></label>
-            </div>
+      <div class="input-group">
+        <label>メモ</label>
+        <textarea id="event-memo" placeholder="詳細や場所などをメモ..."></textarea>
+      </div>
 
-            <div class="input-group">
-                <label>開始</label>
-                <input type="datetime-local" id="event-start">
-            </div>
-            <div class="input-group">
-                <label>終了</label>
-                <input type="datetime-local" id="event-end">
-            </div>
-
-            <div class="input-group">
-                <label>メモ</label>
-                <textarea id="event-memo" placeholder="詳細や場所などをメモ..."></textarea>
-            </div>
-
-            <label
-                style="display:block; font-size:12px; color:#86868b; font-weight:bold; margin-bottom:8px;">カラー</label>
-            <div class="color-palette">
-                <div class="color-circle active" style="background:#ff3b30;" onclick="selectColor('#ff3b30', this)">
-                </div>
-                <div class="color-circle" style="background:#ff9500;" onclick="selectColor('#ff9500', this)"></div>
-                <div class="color-circle" style="background:#ffcc00;" onclick="selectColor('#ffcc00', this)"></div>
-                <div class="color-circle" style="background:#34c759;" onclick="selectColor('#34c759', this)"></div>
-                <div class="color-circle" style="background:#007aff;" onclick="selectColor('#007aff', this)"></div>
-                <div class="color-circle" style="background:#5856d6;" onclick="selectColor('#5856d6', this)"></div>
-                <div class="color-circle" style="background:#ff2d55;" onclick="selectColor('#ff2d55', this)"></div>
-            </div>
-            <button class="save" onclick="saveEvent()">追加する</button>
-        </div>
+      <label style="display:block; font-size:12px; color:#86868b; font-weight:bold; margin-bottom:8px;">カラー</label>
+      <div class="color-palette">
+        <div class="color-circle active" style="background:#ff3b30;" onclick="selectColor('#ff3b30', this)"></div>
+        <div class="color-circle" style="background:#ff9500;" onclick="selectColor('#ff9500', this)"></div>
+        <div class="color-circle" style="background:#ffcc00;" onclick="selectColor('#ffcc00', this)"></div>
+        <div class="color-circle" style="background:#34c759;" onclick="selectColor('#34c759', this)"></div>
+        <div class="color-circle" style="background:#007aff;" onclick="selectColor('#007aff', this)"></div>
+        <div class="color-circle" style="background:#5856d6;" onclick="selectColor('#5856d6', this)"></div>
+        <div class="color-circle" style="background:#ff2d55;" onclick="selectColor('#ff2d55', this)"></div>
+      </div>
+      <button class="save" onclick="saveEvent()">追加する</button>
     </div>
+  </div>
 
-    <script>
-        const GAS_URL = 'https://script.google.com/macros/s/AKfycbyVivCWCgC1JdpM3whiYKVTpFYLjbWchpB9o_5_VJUN_jIiL9P59UVSXSICNL1pb64W/exec'; // ★GASのURLを貼る
-        let calendar;
-        let selectedColor = '#ff3b30';
-        let cachedEvents = null; // ① 予定データを記憶（キャッシュ）するための変数
+  <script>
+    // ☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+    // ☆ ここにご自身のGASのウェブアプリURLを貼り付けてください ☆
+    // ☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbyVivCWCgC1JdpM3whiYKVTpFYLjbWchpB9o_5_VJUN_jIiL9P59UVSXSICNL1pb64W/exec'; 
 
-        function selectColor(color, el) {
-            selectedColor = color;
-            document.querySelectorAll('.color-circle').forEach(c => c.classList.remove('active'));
-            el.classList.add('active');
+    let calendar;
+    let selectedColor = '#ff3b30';
+    let cachedEvents = null;
+    
+    // 天気のデフォルト座標（札幌）
+    let currentLat = 43.0642;
+    let currentLon = 141.3469;
+
+    function selectColor(color, el) {
+      selectedColor = color;
+      document.querySelectorAll('.color-circle').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      fetchWeather();
+
+      const calendarEl = document.getElementById('calendar');
+      calendar = new FullCalendar.Calendar(calendarEl, {
+        locale: 'ja',
+        headerToolbar: { left: 'prev,next', center: 'title', right: 'dayGridMonth,listWeek' },
+        buttonText: { month: '月', listWeek: '週' },
+        views: {
+          dayGridMonth: { titleFormat: { year: 'numeric', month: '2-digit' } },
+          listWeek: { titleFormat: { year: 'numeric', month: '2-digit', day: '2-digit' } },
+          listDay: { titleFormat: { year: 'numeric', month: '2-digit', day: '2-digit' } }
+        },
+        dayCellContent: function(arg) { return arg.date.getDate(); },
+        initialView: 'dayGridMonth',
+        height: 'auto',
+        aspectRatio: 0.8,
+        eventDisplay: 'block',
+        displayEventTime: false,
+        
+        events: function(fetchInfo, successCallback, failureCallback) {
+          if (cachedEvents) {
+            successCallback(cachedEvents);
+            return;
+          }
+          document.getElementById('loading-spinner').style.display = 'block';
+          fetch(GAS_URL)
+            .then(res => res.json())
+            .then(data => {
+              cachedEvents = data;
+              successCallback(data);
+              document.getElementById('loading-spinner').style.display = 'none';
+            })
+            .catch(err => {
+              document.getElementById('loading-spinner').style.display = 'none';
+              failureCallback(err);
+            });
+        },
+        
+        eventClick: function(info) {
+          if (info.view.type === 'dayGridMonth') {
+            calendar.changeView('listDay', info.event.start);
+          } else {
+            openDetail(info.event);
+          }
+        },
+        dateClick: function(info) {
+          requestAnimationFrame(() => {
+            calendar.changeView('listDay', info.dateStr);
+          });
         }
+      });
+      calendar.render();
 
-        document.addEventListener('DOMContentLoaded', function () {
-            fetchWeather();
+      // ヘッダータップで月表示へ戻る
+      document.body.addEventListener('click', function(e) {
+        if (e.target.classList.contains('fc-toolbar-title')) {
+          calendar.changeView('dayGridMonth');
+        }
+      });
 
-            const calendarEl = document.getElementById('calendar');
-            calendar = new FullCalendar.Calendar(calendarEl, {
-                locale: 'ja',
-                headerToolbar: { left: 'prev,next', center: 'title', right: 'dayGridMonth,listWeek' },
-                buttonText: { month: '月', listWeek: '週' },
-                views: {
-                    dayGridMonth: { titleFormat: { year: 'numeric', month: '2-digit' } },
-                    listWeek: { titleFormat: { year: 'numeric', month: '2-digit', day: '2-digit' } },
-                    listDay: { titleFormat: { year: 'numeric', month: '2-digit', day: '2-digit' } }
-                },
-                dayCellContent: function (arg) { return arg.date.getDate(); },
-                initialView: 'dayGridMonth',
-                height: 'auto',
-                aspectRatio: 0.8,
-                eventDisplay: 'block',
-                displayEventTime: false,
+      // 横スワイプで月を切り替える（なめらかアニメーション）
+      let touchStartX = 0;
+      let touchStartY = 0;
+      const wrapperEl = document.getElementById('calendar-wrapper');
+      
+      wrapperEl.addEventListener('touchstart', e => {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+      }, {passive: true});
+      
+      wrapperEl.addEventListener('touchend', e => {
+        let touchEndX = e.changedTouches[0].screenX;
+        let touchEndY = e.changedTouches[0].screenY;
+        let xDiff = touchStartX - touchEndX;
+        let yDiff = touchStartY - touchEndY;
+        
+        if (Math.abs(xDiff) > Math.abs(yDiff) && Math.abs(xDiff) > 50) {
+          calendarEl.style.transition = 'transform 0.15s ease-in, opacity 0.15s ease-in';
+          calendarEl.style.opacity = '0';
+          calendarEl.style.transform = xDiff > 0 ? 'translateX(-30px)' : 'translateX(30px)';
 
-                // ① 初回だけ通信してデータを取得する仕組み
-                events: function (fetchInfo, successCallback, failureCallback) {
-                    if (cachedEvents) {
-                        // 既に記憶しているデータがあれば、通信せずにそれを表示する
-                        successCallback(cachedEvents);
-                        return;
-                    }
-                    document.getElementById('loading-spinner').style.display = 'block';
-                    fetch(GAS_URL)
-                        .then(res => res.json())
-                        .then(data => {
-                            cachedEvents = data;
-                            successCallback(data);
-                            document.getElementById('loading-spinner').style.display = 'none';
-                        })
-                        .catch(err => {
-                            document.getElementById('loading-spinner').style.display = 'none';
-                            failureCallback(err);
-                        });
-                },
+          setTimeout(() => {
+            if (xDiff > 0) calendar.next();
+            else calendar.prev();
+            
+            calendarEl.style.transition = 'none';
+            calendarEl.style.transform = xDiff > 0 ? 'translateX(30px)' : 'translateX(-30px)';
 
-                eventClick: function (info) {
-                    const viewType = info.view.type;
-                    if (viewType === 'dayGridMonth') {
-                        calendar.changeView('listDay', info.event.start);
-                    } else {
-                        openDetail(info.event);
-                    }
-                },
-                dateClick: function (info) {
-                    requestAnimationFrame(() => {
-                        calendar.changeView('listDay', info.dateStr);
-                    });
-                }
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                calendarEl.style.transition = 'transform 0.25s ease-out, opacity 0.25s ease-out';
+                calendarEl.style.opacity = '1';
+                calendarEl.style.transform = 'translateX(0)';
+              });
             });
-            calendar.render();
+          }, 150);
+        }
+      }, {passive: true});
 
-            // ヘッダータップで月表示へ戻る
-            document.body.addEventListener('click', function (e) {
-                if (e.target.classList.contains('fc-toolbar-title')) {
-                    calendar.changeView('dayGridMonth');
-                }
-            });
+      // 下スワイプで入力フォームを閉じる
+      const formContainer = document.getElementById('form-container');
+      let sheetStartY = 0;
+      formContainer.addEventListener('touchstart', e => {
+        sheetStartY = e.touches[0].clientY;
+      }, {passive: true});
+      formContainer.addEventListener('touchmove', e => {
+        let currentY = e.touches[0].clientY;
+        if (currentY - sheetStartY > 60) closeForm();
+      }, {passive: true});
+    });
 
-            // ② 横スワイプで月を切り替える処理（なめらかアニメーション付き）
-            let touchStartX = 0;
-            let touchStartY = 0;
-            const calendarEl = document.getElementById('calendar');
-            const wrapperEl = document.getElementById('calendar-wrapper');
+    // 予定の詳細表示
+    function openDetail(eventObj) {
+      const overlay = document.getElementById('detail-overlay');
+      document.getElementById('detail-title').innerText = eventObj.title;
+      let timeStr = '終日';
+      if (!eventObj.allDay && eventObj.start) {
+        const s = eventObj.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        const e = eventObj.end ? eventObj.end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+        timeStr = e ? `${s} 〜 ${e}` : s;
+      }
+      document.getElementById('detail-time').innerText = timeStr;
+      const memo = eventObj.extendedProps.memo || 'メモはありません';
+      document.getElementById('detail-memo').innerText = memo;
+      overlay.style.display = 'flex';
+      setTimeout(() => overlay.classList.add('show'), 10);
+    }
 
-            wrapperEl.addEventListener('touchstart', e => {
-                touchStartX = e.changedTouches[0].screenX;
-                touchStartY = e.changedTouches[0].screenY;
-            }, { passive: true });
+    function closeDetail(e) {
+      if (e && e.target !== document.getElementById('detail-overlay')) return;
+      const overlay = document.getElementById('detail-overlay');
+      overlay.classList.remove('show');
+      setTimeout(() => overlay.style.display = 'none', 200);
+    }
 
-            wrapperEl.addEventListener('touchend', e => {
-                let touchEndX = e.changedTouches[0].screenX;
-                let touchEndY = e.changedTouches[0].screenY;
-                let xDiff = touchStartX - touchEndX;
-                let yDiff = touchStartY - touchEndY;
+    // スマート検索（Wikipedia＋AI連携）
+    // ★ AI検索（GAS経由の安全なGemini連携版）
+    async function executeAISearch() {
+      const query = document.getElementById('main-search').value.trim();
+      if (!query) return;
 
-                // 縦より横の移動が大きく、かつ50px以上動かした場合
-                if (Math.abs(xDiff) > Math.abs(yDiff) && Math.abs(xDiff) > 50) {
+      document.getElementById('main-search').blur();
+      const resultBox = document.getElementById('inline-search-result');
+      const content = document.getElementById('search-content');
 
-                    // 1. スワイプした方向へスライドしながらフェードアウト
-                    calendarEl.style.transition = 'transform 0.15s ease-in, opacity 0.15s ease-in';
-                    calendarEl.style.opacity = '0';
-                    calendarEl.style.transform = xDiff > 0 ? 'translateX(-30px)' : 'translateX(30px)';
+      resultBox.style.display = 'block';
+      content.innerHTML = '✨ AIが考えています...';
 
-                    // 2. 少し待ってから月を切り替え、逆側からスライドイン
-                    setTimeout(() => {
-                        if (xDiff > 0) calendar.next(); // 左スワイプ -> 翌月
-                        else calendar.prev();           // 右スワイプ -> 前月
-
-                        // 逆側に瞬間移動させる（アニメーションなし）
-                        calendarEl.style.transition = 'none';
-                        calendarEl.style.transform = xDiff > 0 ? 'translateX(30px)' : 'translateX(-30px)';
-
-                        // 3. 元の位置へなめらかに戻す
-                        requestAnimationFrame(() => {
-                            requestAnimationFrame(() => {
-                                calendarEl.style.transition = 'transform 0.25s ease-out, opacity 0.25s ease-out';
-                                calendarEl.style.opacity = '1';
-                                calendarEl.style.transform = 'translateX(0)';
-                            });
-                        });
-                    }, 150); // フェードアウトを待つ時間
-                }
-            }, { passive: true });
-
-            // ③ 入力フォームを下にスワイプして閉じる処理
-            const formContainer = document.getElementById('form-container');
-            let sheetStartY = 0;
-            formContainer.addEventListener('touchstart', e => {
-                sheetStartY = e.touches[0].clientY;
-            }, { passive: true });
-            formContainer.addEventListener('touchmove', e => {
-                let currentY = e.touches[0].clientY;
-                if (currentY - sheetStartY > 60) { // 下に60px以上引っ張ったら閉じる
-                    closeForm();
-                }
-            }, { passive: true });
+      try {
+        // GASに向かって「AI検索をお願い！」と投げる
+        const response = await fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'ai_search', query: query })
         });
+        const data = await response.json();
 
-        // 予定の詳細モーダル
-        function openDetail(eventObj) {
-            const overlay = document.getElementById('detail-overlay');
-            document.getElementById('detail-title').innerText = eventObj.title;
-            let timeStr = '終日';
-            if (!eventObj.allDay && eventObj.start) {
-                const s = eventObj.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                const e = eventObj.end ? eventObj.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-                timeStr = e ? `${s} 〜 ${e}` : s;
-            }
-            document.getElementById('detail-time').innerText = timeStr;
-            const memo = eventObj.extendedProps.memo || 'メモはありません';
-            document.getElementById('detail-memo').innerText = memo;
-            overlay.style.display = 'flex';
-            setTimeout(() => overlay.classList.add('show'), 10);
+        if (data && data.status === 'success') {
+          content.innerHTML = `<strong>✨ AIの回答</strong><br><br>${data.text.replace(/\n/g, '<br>')}`;
+        } else {
+          content.innerHTML = 'AIからうまく回答を受け取れませんでした。';
         }
+      } catch (err) {
+        content.innerHTML = 'エラーが発生しました。通信環境を確認してください。';
+      }
+    }
 
-        function closeDetail(e) {
-            if (e && e.target !== document.getElementById('detail-overlay')) return;
-            const overlay = document.getElementById('detail-overlay');
-            overlay.classList.remove('show');
-            setTimeout(() => overlay.style.display = 'none', 200);
+    // 天気取得（Open-Meteo・CORS対策版）
+    async function fetchWeather() {
+      try {
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${currentLat}&longitude=${currentLon}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto`);
+        if (!res.ok) throw new Error('API Error');
+        const data = await res.json();
+        
+        const widget = document.getElementById('weather-widget');
+        const days = ['日', '月', '火', '水', '木', '金', '土'];
+        let html = '';
+        
+        for(let i = 0; i < 7; i++) {
+          const date = new Date(data.daily.time[i]);
+          const dayStr = i === 0 ? '今日' : days[date.getDay()];
+          const code = data.daily.weathercode[i];
+          const max = Math.round(data.daily.temperature_2m_max[i]);
+          const min = Math.round(data.daily.temperature_2m_min[i]);
+          
+          let emoji = '☀️';
+          if(code >= 1 && code <= 3) emoji = '☁️';
+          if(code >= 45 && code <= 48) emoji = '🌫️';
+          if(code >= 51 && code <= 67) emoji = '🌧️';
+          if(code >= 71 && code <= 77) emoji = '❄️';
+          if(code >= 80 && code <= 82) emoji = '☔';
+          if(code >= 85 && code <= 86) emoji = '🌨️';
+          if(code >= 95) emoji = '⛈️';
+          
+          html += `<div class="weather-day"><div class="w-day">${dayStr}</div><div class="w-icon">${emoji}</div><div class="w-temp"><span class="max">${max}°</span><span class="min">${min}°</span></div></div>`;
         }
+        widget.innerHTML = html;
+      } catch (err) {
+        document.getElementById('weather-widget').innerHTML = '<div style="padding:12px; font-size:12px; color:#86868b;">☁️ 天気サーバーが一時的に混雑しています。</div>';
+      }
+    }
 
-        // AI検索機能（GAS経由）
-        async function executeAISearch() {
-            const query = document.getElementById('main-search').value.trim();
-            if (!query) return;
-            document.getElementById('main-search').blur();
-            const resultBox = document.getElementById('inline-search-result');
-            const content = document.getElementById('search-content');
-            resultBox.style.display = 'block';
-            content.innerHTML = '✨ AIが考えています...';
-
-            try {
-                const response = await fetch(GAS_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify({ action: 'ai_search', query: query })
-                });
-                const data = await response.json();
-
-                if (data && data.status === 'success') {
-                    content.innerHTML = `<strong>✨ AIの回答</strong><br><br>${data.text.replace(/\n/g, '<br>')}`;
-                } else {
-                    content.innerHTML = 'AIからうまく回答を受け取れませんでした。';
-                }
-            } catch (err) {
-                content.innerHTML = 'エラーが発生しました。ネットワーク接続を確認してください。';
-            }
+    // GPSから現在地を取得して天気を更新
+    function getGPSWeather() {
+      if (!navigator.geolocation) {
+        alert("お使いの端末は現在地機能に対応していません。");
+        return;
+      }
+      document.getElementById('weather-widget').innerHTML = '<div style="padding:12px; font-size:12px; color:#86868b;">📍 現在地を取得中...</div>';
+      
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          currentLat = position.coords.latitude;
+          currentLon = position.coords.longitude;
+          document.getElementById('weather-location').innerText = '📍 現在地の天気';
+          fetchWeather();
+        },
+        (error) => {
+          alert("位置情報の取得が許可されませんでした。");
+          fetchWeather(); 
         }
+      );
+    }
 
-        // 天気取得
-        async function fetchWeather() {
-            try {
-                const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=43.0642&longitude=141.3469&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto');
-                if (!res.ok) throw new Error('API Error');
-                const data = await res.json();
-                const widget = document.getElementById('weather-widget');
-                const days = ['日', '月', '火', '水', '木', '金', '土'];
-                let html = '';
-                for (let i = 0; i < 7; i++) {
-                    const date = new Date(data.daily.time[i]);
-                    const dayStr = i === 0 ? '今日' : days[date.getDay()];
-                    const code = data.daily.weathercode[i];
-                    const max = Math.round(data.daily.temperature_2m_max[i]);
-                    const min = Math.round(data.daily.temperature_2m_min[i]);
-                    let emoji = '☀️';
-                    if (code >= 1 && code <= 3) emoji = '☁️';
-                    if (code >= 45 && code <= 48) emoji = '🌫️';
-                    if (code >= 51 && code <= 67) emoji = '🌧️';
-                    if (code >= 71 && code <= 77) emoji = '❄️';
-                    if (code >= 80 && code <= 82) emoji = '☔';
-                    if (code >= 85 && code <= 86) emoji = '🌨️';
-                    if (code >= 95) emoji = '⛈️';
-                    html += `<div class="weather-day"><div class="w-day">${dayStr}</div><div class="w-icon">${emoji}</div><div class="w-temp"><span class="max">${max}°</span><span class="min">${min}°</span></div></div>`;
-                }
-                widget.innerHTML = html;
-            } catch (err) {
-                document.getElementById('weather-widget').innerHTML = '⚠️ 天気の取得に失敗しました';
-            }
-        }
+    // 日時フォームの制御
+    function toggleAllDay() {
+      const isAllDay = document.getElementById('all-day-toggle').checked;
+      const startInput = document.getElementById('event-start');
+      const endInput = document.getElementById('event-end');
+      const currentStart = startInput.value;
+      const currentEnd = endInput.value;
+      if (isAllDay) {
+        startInput.type = 'date'; endInput.type = 'date';
+        startInput.value = currentStart ? currentStart.split('T')[0] : '';
+        endInput.value = currentEnd ? currentEnd.split('T')[0] : '';
+      } else {
+        startInput.type = 'datetime-local'; endInput.type = 'datetime-local';
+        startInput.value = currentStart ? currentStart + 'T12:00' : '';
+        endInput.value = currentEnd ? currentEnd + 'T13:00' : '';
+      }
+    }
 
-        function toggleAllDay() {
-            const isAllDay = document.getElementById('all-day-toggle').checked;
-            const startInput = document.getElementById('event-start');
-            const endInput = document.getElementById('event-end');
-            const currentStart = startInput.value;
-            const currentEnd = endInput.value;
-            if (isAllDay) {
-                startInput.type = 'date'; endInput.type = 'date';
-                startInput.value = currentStart ? currentStart.split('T')[0] : '';
-                endInput.value = currentEnd ? currentEnd.split('T')[0] : '';
-            } else {
-                startInput.type = 'datetime-local'; endInput.type = 'datetime-local';
-                startInput.value = currentStart ? currentStart + 'T12:00' : '';
-                endInput.value = currentEnd ? currentEnd + 'T13:00' : '';
-            }
-        }
+    function openForm() {
+      const overlay = document.getElementById('form-overlay');
+      overlay.style.display = 'flex';
+      setTimeout(() => overlay.classList.add('show'), 10);
+      document.getElementById('all-day-toggle').checked = false;
+      document.getElementById('event-start').type = 'datetime-local';
+      document.getElementById('event-end').type = 'datetime-local';
+      
+      let baseDate = calendar.getDate(); 
+      let now = new Date();
+      baseDate.setHours(now.getHours() + 1); 
+      baseDate.setMinutes(0);
+      
+      const startStr = new Date(baseDate.getTime() - (baseDate.getTimezoneOffset() * 60000)).toISOString().substring(0, 16);
+      document.getElementById('event-start').value = startStr;
+      let endDate = new Date(baseDate); endDate.setHours(endDate.getHours() + 1);
+      const endStr = new Date(endDate.getTime() - (endDate.getTimezoneOffset() * 60000)).toISOString().substring(0, 16);
+      document.getElementById('event-end').value = endStr;
+      document.getElementById('event-memo').value = ''; 
+    }
 
-        function openForm() {
-            const overlay = document.getElementById('form-overlay');
-            overlay.style.display = 'flex';
-            setTimeout(() => overlay.classList.add('show'), 10);
-            document.getElementById('all-day-toggle').checked = false;
-            document.getElementById('event-start').type = 'datetime-local';
-            document.getElementById('event-end').type = 'datetime-local';
+    function closeForm(e) {
+      if (e && e.type === 'click' && e.target !== document.getElementById('form-overlay')) return;
+      const overlay = document.getElementById('form-overlay');
+      overlay.classList.remove('show');
+      setTimeout(() => { 
+        overlay.style.display = 'none'; 
+        document.getElementById('event-title').value = ''; 
+      }, 300);
+    }
 
-            let baseDate = calendar.getDate();
-            let now = new Date();
-            baseDate.setHours(now.getHours() + 1);
-            baseDate.setMinutes(0);
+    // 予定の保存処理
+    function saveEvent() {
+      const title = document.getElementById('event-title').value;
+      const start = document.getElementById('event-start').value;
+      let end = document.getElementById('event-end').value;
+      const memo = document.getElementById('event-memo').value.replace(/\n/g, ' ');
+      const isAllDay = document.getElementById('all-day-toggle').checked;
+      
+      if (!title || !start || !end) return alert('入力してください');
 
-            const startStr = new Date(baseDate.getTime() - (baseDate.getTimezoneOffset() * 60000)).toISOString().substring(0, 16);
-            document.getElementById('event-start').value = startStr;
-            let endDate = new Date(baseDate); endDate.setHours(endDate.getHours() + 1);
-            const endStr = new Date(endDate.getTime() - (endDate.getTimezoneOffset() * 60000)).toISOString().substring(0, 16);
-            document.getElementById('event-end').value = endStr;
-            document.getElementById('event-memo').value = '';
-        }
+      let adjustedEnd = end;
+      if (isAllDay) {
+        let endDate = new Date(end); endDate.setDate(endDate.getDate() + 1);
+        adjustedEnd = endDate.toISOString().split('T')[0];
+      }
+      
+      const payload = { title: title, start: start, end: adjustedEnd, color: selectedColor, allDay: isAllDay, memo: memo };
 
-        // ③ 背景タップや下スワイプで閉じる処理
-        function closeForm(e) {
-            // フォームの入力欄などをタップした時は閉じないようにする
-            if (e && e.type === 'click' && e.target !== document.getElementById('form-overlay')) return;
+      const tempEvent = calendar.addEvent({
+        id: 'temp-' + Date.now(), title: title, start: start, end: adjustedEnd, allDay: isAllDay, backgroundColor: selectedColor, borderColor: selectedColor,
+        extendedProps: { memo: memo }
+      }); 
+      closeForm();
 
-            const overlay = document.getElementById('form-overlay');
-            overlay.classList.remove('show');
-            setTimeout(() => {
-                overlay.style.display = 'none';
-                document.getElementById('event-title').value = '';
-            }, 300);
-        }
-
-        function saveEvent() {
-            const title = document.getElementById('event-title').value;
-            const start = document.getElementById('event-start').value;
-            let end = document.getElementById('event-end').value;
-            const memo = document.getElementById('event-memo').value.replace(/\n/g, ' ');
-            const isAllDay = document.getElementById('all-day-toggle').checked;
-
-            if (!title || !start || !end) return alert('入力してください');
-
-            let adjustedEnd = end;
-            if (isAllDay) {
-                let endDate = new Date(end); endDate.setDate(endDate.getDate() + 1);
-                adjustedEnd = endDate.toISOString().split('T')[0];
-            }
-
-            const payload = { title: title, start: start, end: adjustedEnd, color: selectedColor, allDay: isAllDay, memo: memo };
-
-            const tempEvent = calendar.addEvent({
-                id: 'temp-' + Date.now(), title: title, start: start, end: adjustedEnd, allDay: isAllDay, backgroundColor: selectedColor, borderColor: selectedColor,
-                extendedProps: { memo: memo }
-            });
-            closeForm();
-
-            fetch(GAS_URL, {
-                method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload)
-            }).then(() => {
-                tempEvent.remove();
-                cachedEvents = null; // ① 保存したらキャッシュをリセットして最新を取得させる
-                calendar.refetchEvents();
-            });
-        }
-    </script>
+      fetch(GAS_URL, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload)
+      }).then(() => {
+        tempEvent.remove(); 
+        cachedEvents = null; 
+        calendar.refetchEvents();
+      });
+    }
+  </script>
 </body>
-
 </html>

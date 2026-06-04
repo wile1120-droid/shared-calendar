@@ -9,106 +9,68 @@
   <style>
     :root {
       --primary: #007aff;
-      --bg-color: #f2f2f7; /* iOSの標準背景色に近いグレー */
+      --bg-color: #f2f2f7;
       --surface: #ffffff;
       --text-main: #1c1c1e;
-      --border: #c6c6c8;
+      --border: #e5e5ea;
     }
 
-    /* iPhone特有のスクロールバウンスを防ぎ、アプリ感を出す */
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; 
-      margin: 0; 
-      padding: 0;
-      background: var(--bg-color); 
-      color: var(--text-main);
-      overscroll-behavior-y: none; /* 画面全体の引っ張りを無効化 */
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 0; background: var(--bg-color); color: var(--text-main); overscroll-behavior-y: none; height: 100vh; display: flex; flex-direction: column; }
     
-    /* カレンダーエリア（スクロール可能領域） */
-    #calendar-wrapper {
-      flex: 1;
-      padding: env(safe-area-inset-top) 12px calc(env(safe-area-inset-bottom) + 80px) 12px;
-      overflow-y: auto; /* ここだけスクロールさせる */
-    }
+    /* カレンダーと下部余白（検索バー分を空ける） */
+    #calendar-wrapper { flex: 1; padding: env(safe-area-inset-top) 12px calc(env(safe-area-inset-bottom) + 140px) 12px; overflow-y: auto; }
+    #calendar { max-width: 900px; margin: 0 auto; background: var(--surface); padding: 16px; border-radius: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
 
-    #calendar { 
-      max-width: 900px; 
-      margin: 0 auto; 
-      background: var(--surface); 
-      padding: 16px; 
-      border-radius: 20px; 
-      box-shadow: 0 2px 12px rgba(0,0,0,0.04); 
-    }
-
-    /* FullCalendarのボタンやリストをiOS風に上書き */
-    .fc .fc-button-primary { background-color: var(--primary) !important; border: none !important; border-radius: 8px !important; text-transform: capitalize; }
-    .fc .fc-button-primary:not(:disabled):active, .fc .fc-button-primary:not(:disabled).fc-button-active { background-color: #005bb5 !important; }
+    /* FullCalendarの見た目調整 */
+    .fc .fc-toolbar-title { font-size: 1.2em !important; font-weight: bold; letter-spacing: 1px; }
+    .fc .fc-button-primary { background-color: var(--primary) !important; border: none !important; border-radius: 8px !important; }
     .fc-theme-standard td, .fc-theme-standard th { border-color: var(--border); }
-    .fc-list-day-cushion { background-color: #f2f2f7 !important; font-weight: bold; }
-    
-    /* 右下の「＋」ボタン (FAB) */
+    /* すべての予定をブロック型に角丸にする */
+    .fc-event { border-radius: 6px !important; border: none !important; font-weight: 500; padding: 2px 4px; overflow: hidden; }
+
+    /* AI検索バー (画面下部に固定) */
+    .search-bar-container {
+      position: fixed; bottom: calc(env(safe-area-inset-bottom) + 12px); left: 12px; right: 12px;
+      background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px);
+      padding: 12px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      display: flex; align-items: center; z-index: 800;
+    }
+    .search-bar-container span { font-size: 20px; margin-right: 10px; }
+    .search-bar-container input { flex: 1; border: none; background: #f2f2f7; padding: 12px 16px; border-radius: 12px; font-size: 16px; outline: none; }
+
+    /* 右下の＋ボタン（検索バーの上に配置） */
     .fab {
-      position: fixed;
-      bottom: calc(env(safe-area-inset-bottom) + 24px);
-      right: 24px;
-      width: 60px;
-      height: 60px;
-      background-color: var(--primary);
-      color: white;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 32px;
-      box-shadow: 0 4px 16px rgba(0, 122, 255, 0.4);
-      z-index: 900;
-      cursor: pointer;
-      transition: transform 0.1s;
+      position: fixed; bottom: calc(env(safe-area-inset-bottom) + 85px); right: 20px;
+      width: 56px; height: 56px; background-color: var(--primary); color: white;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 32px; box-shadow: 0 4px 16px rgba(0, 122, 255, 0.4); z-index: 900; cursor: pointer;
     }
-    .fab:active { transform: scale(0.9); }
 
-    /* ボトムシート（下からスライドしてくる入力画面） */
-    #form-overlay { 
-      display: none; 
-      position: fixed; 
-      top: 0; left: 0; right: 0; bottom: 0; 
-      background: rgba(0,0,0,0.5); 
-      z-index: 1000; 
-      align-items: flex-end; /* 下寄せ */
-      backdrop-filter: blur(2px);
-    }
-    
-    #form-container { 
-      background: var(--surface); 
-      width: 100%; 
-      padding: 24px 24px calc(env(safe-area-inset-bottom) + 24px) 24px; 
-      box-sizing: border-box; 
-      border-radius: 24px 24px 0 0; /* 上の角だけ丸く */
-      transform: translateY(100%);
-      transition: transform 0.3s cubic-bezier(0.1, 0.8, 0.2, 1);
-    }
+    /* ボトムシート入力フォーム */
+    #form-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 1000; align-items: flex-end; backdrop-filter: blur(2px); }
+    #form-container { background: var(--surface); width: 100%; padding: 20px 24px calc(env(safe-area-inset-bottom) + 24px) 24px; box-sizing: border-box; border-radius: 24px 24px 0 0; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.1, 0.8, 0.2, 1); }
     #form-overlay.show #form-container { transform: translateY(0); }
-
-    /* シート上部の「つまみ」デザイン */
-    .drag-handle { width: 40px; height: 5px; background: #e5e5ea; border-radius: 3px; margin: 0 auto 20px auto; }
+    .drag-handle { width: 40px; height: 5px; background: #e5e5ea; border-radius: 3px; margin: 0 auto 16px auto; }
 
     .input-group { margin-bottom: 16px; }
     .input-group label { display: block; font-size: 13px; color: #86868b; margin-bottom: 6px; font-weight: 500; }
-    input[type="text"], input[type="datetime-local"] { width: 100%; padding: 14px; border: none; background: #f2f2f7; border-radius: 12px; box-sizing: border-box; font-size: 16px; outline: none; transition: 0.2s; }
-    input[type="text"]:focus, input[type="datetime-local"]:focus { box-shadow: 0 0 0 2px rgba(0,122,255,0.2); }
+    input[type="text"], input[type="datetime-local"], input[type="date"] { width: 100%; padding: 14px; border: none; background: #f2f2f7; border-radius: 12px; box-sizing: border-box; font-size: 16px; outline: none; }
+    
+    /* 終日トグルスイッチ */
+    .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .toggle-switch { position: relative; width: 50px; height: 30px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e5e5ea; transition: .3s; border-radius: 30px; }
+    .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    input:checked + .slider { background-color: #34c759; }
+    input:checked + .slider:before { transform: translateX(20px); }
 
-    .color-row { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding: 0 4px; }
-    input[type="color"] { width: 36px; height: 36px; border: none; border-radius: 50%; cursor: pointer; padding: 0; background: none; }
-    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
-    input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+    /* 7色から選ぶカラーパレット */
+    .color-palette { display: flex; justify-content: space-between; margin-bottom: 24px; padding: 0 8px; }
+    .color-circle { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: 0.2s; }
+    .color-circle.active { transform: scale(1.1); border-color: var(--text-main); }
 
-    .btn-row { display: flex; gap: 12px; }
-    button.save { flex: 1; padding: 16px; border: none; border-radius: 14px; font-size: 16px; font-weight: bold; background: var(--primary); color: white; transition: 0.2s; cursor: pointer; }
-    button.save:active { transform: scale(0.96); }
+    button.save { width: 100%; padding: 16px; border: none; border-radius: 14px; font-size: 16px; font-weight: bold; background: var(--primary); color: white; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -119,93 +81,142 @@
 
   <div class="fab" onclick="openForm()">＋</div>
 
+  <div class="search-bar-container">
+    <span>✨</span>
+    <input type="text" id="ai-search" placeholder="予定を検索..." oninput="filterEvents()">
+  </div>
+
   <div id="form-overlay" onclick="closeForm(event)">
     <div id="form-container" onclick="event.stopPropagation()">
       <div class="drag-handle"></div>
       
       <div class="input-group">
-        <label>タイトル</label>
-        <input type="text" id="event-title" placeholder="予定を入力">
+        <input type="text" id="event-title" placeholder="タイトルを入力">
+      </div>
+
+      <div class="toggle-row">
+        <label style="font-size: 16px; color: var(--text-main);">終日</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="all-day-toggle" onchange="toggleAllDay()">
+          <span class="slider"></span>
+        </label>
       </div>
 
       <div class="input-group">
         <label>開始</label>
         <input type="datetime-local" id="event-start">
       </div>
-
-      <div class="input-group">
+      <div class="input-group" id="end-group">
         <label>終了</label>
         <input type="datetime-local" id="event-end">
       </div>
 
-      <div class="color-row">
-        <label style="font-size: 13px; color: #86868b; flex-grow: 1;">カラー</label>
-        <input type="color" id="event-color" value="#007aff">
+      <label style="display:block; font-size:13px; color:#86868b; margin-bottom:8px;">カラー</label>
+      <div class="color-palette">
+        <div class="color-circle active" style="background:#ff3b30;" onclick="selectColor('#ff3b30', this)"></div>
+        <div class="color-circle" style="background:#ff9500;" onclick="selectColor('#ff9500', this)"></div>
+        <div class="color-circle" style="background:#ffcc00;" onclick="selectColor('#ffcc00', this)"></div>
+        <div class="color-circle" style="background:#34c759;" onclick="selectColor('#34c759', this)"></div>
+        <div class="color-circle" style="background:#007aff;" onclick="selectColor('#007aff', this)"></div>
+        <div class="color-circle" style="background:#5856d6;" onclick="selectColor('#5856d6', this)"></div>
+        <div class="color-circle" style="background:#ff2d55;" onclick="selectColor('#ff2d55', this)"></div>
       </div>
 
-      <div class="btn-row">
-        <button class="save" onclick="saveEvent()">追加する</button>
-      </div>
+      <button class="save" onclick="saveEvent()">追加する</button>
     </div>
   </div>
 
   <script>
-    // ★ 必ずご自身のGASのURLに書き換えてください
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbyVivCWCgC1JdpM3whiYKVTpFYLjbWchpB9o_5_VJUN_jIiL9P59UVSXSICNL1pb64W/exec'; 
     let calendar;
+    let selectedColor = '#ff3b30'; // デフォルトは赤
+    let cachedEvents = []; // 検索用にデータを保持
+
+    function selectColor(color, el) {
+      selectedColor = color;
+      document.querySelectorAll('.color-circle').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+    }
 
     document.addEventListener('DOMContentLoaded', function() {
       const calendarEl = document.getElementById('calendar');
       
       calendar = new FullCalendar.Calendar(calendarEl, {
         locale: 'ja',
-        // 右上のボタンを「月」「週(リスト)」「日」に変更
-        headerToolbar: { 
-          left: 'prev,next', 
-          center: 'title', 
-          right: 'dayGridMonth,listWeek,timeGridDay' 
+        // ヘッダーを YYYY/MM に変更
+        titleFormat: function(date) {
+          return date.date.year + '/' + String(date.date.month + 1).padStart(2, '0');
         },
-        buttonText: {
-          month: '月',
-          listWeek: '週',
-          day: '日'
-        },
-        // 日付の「日」を消す
-        dayCellContent: function(arg) {
-          return arg.date.getDate();
-        },
+        headerToolbar: { left: 'prev,next', center: 'title', right: 'dayGridMonth,listWeek' },
+        buttonText: { month: '月', listWeek: '週' },
+        dayCellContent: function(arg) { return arg.date.getDate(); },
         initialView: 'dayGridMonth',
         height: 'auto',
-        contentHeight: 'auto',
-        events: GAS_URL,
-        // 日付タップでもフォームを開けるようにする
+        
+        // すべての予定を「背景色つきのブロック」にする
+        eventDisplay: 'block',
+
+        // データを取得してキャッシュに保存（検索用）
+        events: function(info, successCallback, failureCallback) {
+          fetch(GAS_URL)
+            .then(response => response.json())
+            .then(data => {
+              cachedEvents = data;
+              successCallback(data);
+            });
+        },
+        // 日付タップで1日の詳細画面へ飛ぶ
         dateClick: function(info) {
-          openForm(info.dateStr);
+          calendar.changeView('timeGridDay', info.dateStr);
         }
       });
       calendar.render();
     });
 
-    // フォームをスライド表示する関数
-    function openForm(clickedDateStr = null) {
+    // 終日スイッチの切り替え
+    function toggleAllDay() {
+      const isAllDay = document.getElementById('all-day-toggle').checked;
+      const startInput = document.getElementById('event-start');
+      const endInput = document.getElementById('event-end');
+      
+      if (isAllDay) {
+        startInput.type = 'date';
+        endInput.type = 'date';
+        // 終日の場合、時間の情報を消して日付だけにする
+        startInput.value = startInput.value.split('T')[0];
+        endInput.value = endInput.value.split('T')[0];
+      } else {
+        startInput.type = 'datetime-local';
+        endInput.type = 'datetime-local';
+        // 適当な時間を付与して戻す
+        startInput.value = startInput.value + 'T12:00';
+        endInput.value = endInput.value + 'T13:00';
+      }
+    }
+
+    // リアルタイム検索（AI風）
+    function filterEvents() {
+      const query = document.getElementById('ai-search').value.toLowerCase();
+      // キャッシュからタイトルが一致するものだけを抽出
+      const filtered = cachedEvents.filter(event => event.title.toLowerCase().includes(query));
+      
+      // 一度カレンダーを空にして、絞り込んだ結果を再描画
+      calendar.removeAllEventSources();
+      calendar.addEventSource(filtered);
+    }
+
+    function openForm() {
       const overlay = document.getElementById('form-overlay');
       overlay.style.display = 'flex';
-      // 少し遅らせてクラスを付与し、CSSアニメーションを発火
       setTimeout(() => overlay.classList.add('show'), 10);
-
-      // 時間の初期値をセット（現在時刻の次の時間、またはタップした日付）
-      let startTime = new Date();
-      if (clickedDateStr) {
-        if (clickedDateStr.includes('T')) {
-          startTime = new Date(clickedDateStr);
-        } else {
-          startTime = new Date(clickedDateStr + 'T12:00');
-        }
-      } else {
-        startTime.setHours(startTime.getHours() + 1);
-        startTime.setMinutes(0);
-      }
       
+      // デフォルトは時間指定
+      document.getElementById('all-day-toggle').checked = false;
+      toggleAllDay();
+
+      let startTime = new Date();
+      startTime.setHours(startTime.getHours() + 1);
+      startTime.setMinutes(0);
       const startStr = new Date(startTime.getTime() - (startTime.getTimezoneOffset() * 60000)).toISOString().substring(0, 16);
       document.getElementById('event-start').value = startStr;
       
@@ -215,12 +226,10 @@
       document.getElementById('event-end').value = endStr;
     }
 
-    // フォームを閉じる関数（背景タップでも閉じる）
     function closeForm(e) {
       if (e && e.target !== document.getElementById('form-overlay')) return;
       const overlay = document.getElementById('form-overlay');
       overlay.classList.remove('show');
-      // アニメーションが終わってから非表示にする
       setTimeout(() => {
         overlay.style.display = 'none';
         document.getElementById('event-title').value = '';
@@ -230,19 +239,29 @@
     function saveEvent() {
       const title = document.getElementById('event-title').value;
       const start = document.getElementById('event-start').value;
-      const end = document.getElementById('event-end').value;
-      const color = document.getElementById('event-color').value;
+      let end = document.getElementById('event-end').value;
+      const isAllDay = document.getElementById('all-day-toggle').checked;
 
-      if (!title || !start || !end) return alert('予定のタイトルを入力してください');
+      if (!title || !start || !end) return alert('入力してください');
 
-      const payload = { title: title, start: start, end: end, color: color };
+      // Googleカレンダーの終日は「終了日の翌日」を指定する必要があるため調整
+      let adjustedEnd = end;
+      if (isAllDay) {
+        let endDate = new Date(end);
+        endDate.setDate(endDate.getDate() + 1);
+        adjustedEnd = endDate.toISOString().split('T')[0];
+      }
 
+      const payload = { title: title, start: start, end: adjustedEnd, color: selectedColor, allDay: isAllDay };
+
+      // 画面上に即座に反映
       calendar.addEvent({
         title: title,
         start: start,
-        end: end,
-        backgroundColor: color,
-        borderColor: color
+        end: adjustedEnd,
+        allDay: isAllDay,
+        backgroundColor: selectedColor,
+        borderColor: selectedColor
       }); 
 
       closeForm();
@@ -252,7 +271,9 @@
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(payload)
       }).then(() => {
-        calendar.refetchEvents();
+        // 保存完了後、最新データを読み込み直す（キャッシュも更新）
+        calendar.removeAllEventSources();
+        calendar.addEventSource(GAS_URL);
       });
     }
   </script>

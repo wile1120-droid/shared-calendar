@@ -330,38 +330,25 @@
       setTimeout(() => overlay.style.display = 'none', 200);
     }
 
-    // スマート検索（Wikipedia＋AI連携）
-    // ★ AI検索（GAS経由の安全なGemini連携版）
-    async function executeAISearch() {
+    // ★ Google検索（外部ブラウザを開かず、アプリ内で完結する版）
+    function executeAISearch() {
       const query = document.getElementById('main-search').value.trim();
       if (!query) return;
 
-      document.getElementById('main-search').blur();
+      document.getElementById('main-search').blur(); // キーボードを閉じる
       const resultBox = document.getElementById('inline-search-result');
       const content = document.getElementById('search-content');
 
       resultBox.style.display = 'block';
-      content.innerHTML = '✨ AIが考えています...';
+      resultBox.style.maxHeight = '420px'; // 検索画面が見やすいように枠を少し広げる
 
-      try {
-        // GASに向かって「AI検索をお願い！」と投げる
-        const response = await fetch(GAS_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'ai_search', query: query })
-        });
-        const data = await response.json();
-
-        if (data && data.status === 'success') {
-          content.innerHTML = `<strong>✨ AIの回答</strong><br><br>${data.text.replace(/\n/g, '<br>')}`;
-        } else {
-          content.innerHTML = 'AIからうまく回答を受け取れませんでした。';
-        }
-      } catch (err) {
-        content.innerHTML = 'エラーが発生しました。通信環境を確認してください。';
-      }
+      // &igu=1 をつけることで、Google検索をアプリ内の小窓にそのまま表示させます
+      content.innerHTML = `
+        <iframe src="https://www.google.com/search?q=${encodeURIComponent(query)}&igu=1" 
+                style="width:100%; height:350px; border:none; border-radius:12px; background:#fff;">
+        </iframe>
+      `;
     }
-
     // 天気取得（Open-Meteo・CORS対策版）
     async function fetchWeather() {
       try {

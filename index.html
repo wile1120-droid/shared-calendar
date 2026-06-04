@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="manifest" href="manifest.json">
+  <title>ふたりのカレンダー</title>
+  <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+  <style>
+    body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 12px; background: #FFF9F2; color: #4A4A4A; }
+    #calendar { max-width: 900px; margin: 0 auto; background: #fff; padding: 16px; border-radius: 20px; box-shadow: 0 8px 24px rgba(255,182,193,0.2); border: 2px solid #FFE4E1; }
+    
+    /* ポップなフォームデザイン */
+    #form-container { display: none; margin-top: 16px; padding: 20px; background: #fff; border-radius: 20px; border: 2px solid #FFB6C1; box-shadow: 0 8px 16px rgba(0,0,0,0.05); }
+    h3 { margin-top: 0; color: #FF6B81; font-size: 18px; text-align: center; }
+    input, select, button { width: 100%; padding: 14px; margin-bottom: 12px; box-sizing: border-box; border: 2px solid #FFE4E1; border-radius: 12px; font-size: 16px; outline: none; }
+    input:focus, select:focus { border-color: #FFB6C1; }
+    
+    /* カテゴリー選択の丸ボタン風ラジオ */
+    .color-selector { display: flex; justify-content: space-between; margin-bottom: 16px; }
+    .color-option { flex: 1; text-align: center; margin: 0 4px; padding: 10px; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; border: 3px solid transparent; }
+    .color-option.active { border-color: #4A4A4A; transform: scale(1.05); }
+
+    button.save { background: #FF6B81; color: white; border: none; font-weight: bold; font-size: 18px; cursor: pointer; box-shadow: 0 4px 12px rgba(255,107,129,0.3); transition: 0.2s; }
+    button.save:active { transform: scale(0.98); }
+    button.cancel { background: #f1f2f6; color: #57606f; border: none; cursor: pointer; }
+    
+    /* カレンダー内の予定のフォント調整 */
+    .fc-event { font-weight: bold; border-radius: 6px !important; padding: 2px 4px; }
+  </style>
+</head>
+<body>
+
+  <div id='calendar'></div>
+
+  <div id="form-container">
+    <h3>🎀 新しい予定を追加 🎀</h3>
+    <input type="text" id="event-title" placeholder="なにする？（例：デート、内見）">
+    
+    <div class="color-selector">
+      <div class="color-option active" style="background:#FF6B81;" onclick="selectColor('#FF6B81', this)">デート</div>
+      <div class="color-option" style="background:#FFA502;" onclick="selectColor('#FFA502', this)">内見・手続</div>
+      <div class="color-option" style="background:#2ED573;" onclick="selectColor('#2ED573', this)">ごはん</div>
+      <div class="color-option" style="background:#1E90FF;" onclick="selectColor('#1E90FF', this)">その他</div>
+    </div>
+
+    <input type="datetime-local" id="event-start">
+    <input type="datetime-local" id="event-end">
+    <button class="save" onclick="saveEvent()">すぐに保存！</button>
+    <button class="cancel" onclick="document.getElementById('form-container').style.display='none'">やめる</button>
+  </div>
+
+  <script>
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbyVivCWCgC1JdpM3whiYKVTpFYLjbWchpB9o_5_VJUN_jIiL9P59UVSXSICNL1pb64W/exec'; // あなたのGASのURL
+    let calendar;
+    let selectedColor = '#FF6B81'; // デフォルトはデート色
+
+    function selectColor(color, element) {
+      selectedColor = color;
+      document.querySelectorAll('.color-option').forEach(el => el.classList.remove('active'));
+      element.classList.add('active');
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const calendarEl = document.getElementById('calendar');
+      
+      calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        locale: 'ja', // ★日本語化！
+        headerToolbar: { left: 'prev,next', center: 'title', right: 'today' },
+        height: 'auto',
+        events: GAS_URL,
+        dateClick: function(info) {
+          document.getElementById('form-container').style.display = 'block';
+          document.getElementById('event-start').value = info.dateStr + 'T12:00';
+          document.getElementById('event-end').value = info.dateStr + 'T13:00';
+          window.scrollTo(0, document.body.scrollHeight);
+        }
+      });
+      calendar.render();
+    });
+
+    // ★爆速保存（楽観的UI）の実装
+    function saveEvent() {
+      const title = document.getElementById('event-title').value;
+      const start = document.getElementById('event-start').value;
+      const end = document.getElementById('event-end').value;
+
+      if (!title || !start || !end) return alert('入力してね！');
+
+      const payload = { title: title, start: start, end: end, color: selectedColor };
+
+      // 1. 【通信を待たずに】画面上に一瞬で仮追加する（これが爆速の秘密）
+      const clientSideEvent = {
+        title: title,
+        start: start,
+        end: end,
+        backgroundColor: selectedColor,
+        borderColor: selectedColor
+      };
+      calendar.addEvent(clientSideEvent); 
+
+      // フォームをすぐ閉じる
+      document.getElementById('event-title').value = '';
+      document.getElementById('form-container').style.display = 'none';
+
+      // 2. 裏側でこっそりGASに保存通信を送る（ユーザーは待たなくて良い）
+      fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      }).then(() => {
+        // 保存が完全に終わったら、裏でカレンダーの最新状態を同期
+        calendar.refetchEvents();
+      });
+    }
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
+  </script>
+</body>
+</html>

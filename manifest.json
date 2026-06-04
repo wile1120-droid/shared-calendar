@@ -1,0 +1,15 @@
+{
+    "short_name": "SharedCal",
+    "name": "ふたりのカレンダー",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#007bff",
+    "icons": [
+        {
+            "src": "IMG_9709.png",
+            "type": "image/png",
+            "sizes": "192x192"
+        }
+    ]
+}

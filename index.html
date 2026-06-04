@@ -1,433 +1,834 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <link rel="manifest" href="manifest.json">
-  <title>Shared Calendar</title>
-  <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
-  <style>
-    :root {
-      --primary: #007aff;
-      --bg-color: #f2f2f7;
-      --surface: #ffffff;
-      --text-main: #1c1c1e;
-      --border: #e5e5ea;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <link rel="manifest" href="manifest.json">
+    <title>Shared Calendar</title>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+    <style>
+        :root {
+            --primary: #007aff;
+            --bg-color: #f2f2f7;
+            --surface: #ffffff;
+            --text-main: #1c1c1e;
+            --border: #e5e5ea;
+        }
 
-    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 0; background: var(--bg-color); color: var(--text-main); overscroll-behavior-y: none; height: 100vh; display: flex; flex-direction: column; }
-    
-    /* 天気ウィジェット（見えなくなる問題を修正） */
-    #weather-widget-container { background: var(--bg-color); padding: env(safe-area-inset-top) 0 4px 0; border-bottom: 1px solid var(--border); }
-    #weather-location { font-size: 11px; color: #86868b; font-weight: bold; margin: 8px 12px 4px 12px; }
-    #weather-widget { display: flex; overflow-x: auto; gap: 8px; padding: 4px 12px 12px 12px; scrollbar-width: none; min-height: 70px; }
-    #weather-widget::-webkit-scrollbar { display: none; }
-    .weather-day { background: var(--surface); padding: 8px; border-radius: 12px; min-width: 45px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.03); flex-shrink: 0; }
-    .w-day { font-size: 11px; color: #86868b; margin-bottom: 2px; font-weight: bold; }
-    .w-icon { font-size: 18px; margin-bottom: 2px; }
-    .w-temp { font-size: 10px; display: flex; justify-content: center; gap: 4px; }
-    .w-temp .max { color: #ff3b30; }
-    .w-temp .min { color: #007aff; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: var(--bg-color);
+            color: var(--text-main);
+            overscroll-behavior-y: none;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
 
-    /* 読み込み中インジケータ */
-    #loading-spinner { display: none; text-align: center; font-size: 12px; color: white; background: var(--primary); padding: 4px; font-weight: bold; }
+        /* 天気ウィジェット（見えなくなる問題を修正） */
+        #weather-widget-container {
+            background: var(--bg-color);
+            padding: env(safe-area-inset-top) 0 4px 0;
+            border-bottom: 1px solid var(--border);
+        }
 
-    /* カレンダーエリア */
-    #calendar-wrapper { flex: 1; padding: 12px 12px calc(env(safe-area-inset-bottom) + 160px) 12px; overflow-y: auto; }
-    #calendar { max-width: 100%; margin: 0 auto; background: var(--surface); padding: 6px; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
+        #weather-location {
+            font-size: 11px;
+            color: #86868b;
+            font-weight: bold;
+            margin: 8px 12px 4px 12px;
+        }
 
-    .fc .fc-toolbar-title { font-size: 1.2em !important; font-weight: bold; letter-spacing: 1px; cursor: pointer; color: var(--primary); }
-    .fc .fc-toolbar-title:active { opacity: 0.6; }
-    .fc .fc-button-primary { background-color: var(--primary) !important; border: none !important; border-radius: 8px !important; }
-    .fc-theme-standard td, .fc-theme-standard th { border-color: var(--border); }
-    
-    /* 縦幅を広げ、タイトルを折り返す */
-    .fc-daygrid-day-frame { min-height: 70px; }
-    .fc-event { border-radius: 6px !important; border: none !important; font-weight: 500; padding: 2px 4px; overflow: hidden; white-space: normal !important; font-size: 11px; line-height: 1.2; }
-    .fc-day-sat { background-color: #f4f8ff !important; }
-    .fc-day-sun { background-color: #fff0f0 !important; }
+        #weather-widget {
+            display: flex;
+            overflow-x: auto;
+            gap: 8px;
+            padding: 4px 12px 12px 12px;
+            scrollbar-width: none;
+            min-height: 70px;
+        }
 
-    /* AI検索バー ＆ インライン結果（検索バーの上に出現） */
-    .search-wrapper { position: fixed; bottom: calc(env(safe-area-inset-bottom) + 12px); left: 12px; right: 12px; z-index: 800; display: flex; flex-direction: column; gap: 8px; }
-    
-    #inline-search-result {
-      display: none; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
-      padding: 16px; border-radius: 16px; box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
-      font-size: 14px; max-height: 250px; overflow-y: auto; line-height: 1.5;
-    }
-    
-    .search-bar-container {
-      background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
-      padding: 8px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-      display: flex; align-items: center; gap: 8px;
-    }
-    .search-bar-container input { flex: 1; border: none; background: #f2f2f7; padding: 12px 16px; border-radius: 12px; font-size: 16px; outline: none; }
-    .search-btn { background: var(--primary); color: white; border: none; border-radius: 12px; padding: 0 16px; font-weight: bold; cursor: pointer; height: 44px; display: flex; align-items: center; justify-content: center; gap: 4px; }
-    .search-btn:active { transform: scale(0.95); }
+        #weather-widget::-webkit-scrollbar {
+            display: none;
+        }
 
-    /* 右下の＋ボタン */
-    .fab { position: fixed; bottom: calc(env(safe-area-inset-bottom) + 85px); right: 20px; width: 56px; height: 56px; background-color: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; box-shadow: 0 4px 16px rgba(0, 122, 255, 0.4); z-index: 900; cursor: pointer; }
-    
-    /* 汎用オーバーレイ（ボトムシート＆詳細モーダル用） */
-    .overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 1000; align-items: flex-end; justify-content: center; backdrop-filter: blur(2px); }
-    
-    /* 予定の詳細を見るモーダル */
-    #detail-container { background: var(--surface); width: 90%; max-width: 400px; padding: 24px; border-radius: 20px; margin-bottom: 20vh; box-shadow: 0 10px 40px rgba(0,0,0,0.2); transform: scale(0.95); transition: 0.2s; opacity: 0; }
-    #detail-overlay.show #detail-container { transform: scale(1); opacity: 1; }
-    #detail-title { margin: 0 0 8px 0; font-size: 20px; font-weight: bold; }
-    #detail-time { color: #007aff; font-size: 14px; margin-bottom: 16px; font-weight: bold; }
-    #detail-memo { background: #f2f2f7; padding: 12px; border-radius: 12px; font-size: 14px; white-space: pre-wrap; margin-bottom: 20px; min-height: 40px; }
-    
-    /* ボトムシート（入力フォーム） */
-    #form-container { background: var(--surface); width: 100%; max-width: 500px; padding: 20px 24px calc(env(safe-area-inset-bottom) + 24px) 24px; box-sizing: border-box; border-radius: 24px 24px 0 0; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.1, 0.8, 0.2, 1); }
-    #form-overlay.show #form-container { transform: translateY(0); }
-    .drag-handle { width: 40px; height: 5px; background: #e5e5ea; border-radius: 3px; margin: 0 auto 16px auto; }
-    
-    /* 縦並びにして、くっつきを解消 */
-    .input-group { margin-bottom: 16px; width: 100%; box-sizing: border-box; }
-    .input-group label { display: block; font-size: 13px; color: #86868b; margin-bottom: 6px; font-weight: bold; }
-    input[type="text"], input[type="datetime-local"], input[type="date"], textarea { width: 100%; padding: 14px; border: none; background: #f2f2f7; border-radius: 12px; box-sizing: border-box; font-size: 16px; outline: none; }
-    textarea { resize: none; height: 80px; }
-    
-    .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 8px 0; border-bottom: 1px solid var(--border); }
-    .toggle-switch { position: relative; width: 50px; height: 30px; }
-    .toggle-switch input { opacity: 0; width: 0; height: 0; }
-    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e5e5ea; transition: .3s; border-radius: 30px; }
-    .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-    input:checked + .slider { background-color: #34c759; }
-    input:checked + .slider:before { transform: translateX(20px); }
+        .weather-day {
+            background: var(--surface);
+            padding: 8px;
+            border-radius: 12px;
+            min-width: 45px;
+            text-align: center;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+            flex-shrink: 0;
+        }
 
-    .color-palette { display: flex; justify-content: space-between; margin-bottom: 24px; padding: 0 8px; }
-    .color-circle { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: 0.2s; }
-    .color-circle.active { transform: scale(1.1); border-color: var(--text-main); }
-    
-    .btn-close { width: 100%; padding: 12px; background: #e5e5ea; border: none; border-radius: 12px; font-weight: bold; font-size: 16px; cursor: pointer; color: #1c1c1e; }
-    button.save { width: 100%; padding: 16px; border: none; border-radius: 14px; font-size: 16px; font-weight: bold; background: var(--primary); color: white; cursor: pointer; }
-  </style>
+        .w-day {
+            font-size: 11px;
+            color: #86868b;
+            margin-bottom: 2px;
+            font-weight: bold;
+        }
+
+        .w-icon {
+            font-size: 18px;
+            margin-bottom: 2px;
+        }
+
+        .w-temp {
+            font-size: 10px;
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .w-temp .max {
+            color: #ff3b30;
+        }
+
+        .w-temp .min {
+            color: #007aff;
+        }
+
+        /* 読み込み中インジケータ */
+        #loading-spinner {
+            display: none;
+            text-align: center;
+            font-size: 12px;
+            color: white;
+            background: var(--primary);
+            padding: 4px;
+            font-weight: bold;
+        }
+
+        /* カレンダーエリア */
+        #calendar-wrapper {
+            flex: 1;
+            padding: 12px 12px calc(env(safe-area-inset-bottom) + 160px) 12px;
+            overflow-y: auto;
+        }
+
+        #calendar {
+            max-width: 100%;
+            margin: 0 auto;
+            background: var(--surface);
+            padding: 6px;
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+        }
+
+        .fc .fc-toolbar-title {
+            font-size: 1.2em !important;
+            font-weight: bold;
+            letter-spacing: 1px;
+            cursor: pointer;
+            color: var(--primary);
+        }
+
+        .fc .fc-toolbar-title:active {
+            opacity: 0.6;
+        }
+
+        .fc .fc-button-primary {
+            background-color: var(--primary) !important;
+            border: none !important;
+            border-radius: 8px !important;
+        }
+
+        .fc-theme-standard td,
+        .fc-theme-standard th {
+            border-color: var(--border);
+        }
+
+        /* 縦幅を広げ、タイトルを折り返す */
+        .fc-daygrid-day-frame {
+            min-height: 70px;
+        }
+
+        .fc-event {
+            border-radius: 6px !important;
+            border: none !important;
+            font-weight: 500;
+            padding: 2px 4px;
+            overflow: hidden;
+            white-space: normal !important;
+            font-size: 11px;
+            line-height: 1.2;
+        }
+
+        .fc-day-sat {
+            background-color: #f4f8ff !important;
+        }
+
+        .fc-day-sun {
+            background-color: #fff0f0 !important;
+        }
+
+        /* AI検索バー ＆ インライン結果（検索バーの上に出現） */
+        .search-wrapper {
+            position: fixed;
+            bottom: calc(env(safe-area-inset-bottom) + 12px);
+            left: 12px;
+            right: 12px;
+            z-index: 800;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        #inline-search-result {
+            display: none;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 16px;
+            border-radius: 16px;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+            font-size: 14px;
+            max-height: 250px;
+            overflow-y: auto;
+            line-height: 1.5;
+        }
+
+        .search-bar-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 8px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .search-bar-container input {
+            flex: 1;
+            border: none;
+            background: #f2f2f7;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .search-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 0 16px;
+            font-weight: bold;
+            cursor: pointer;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .search-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* 右下の＋ボタン */
+        .fab {
+            position: fixed;
+            bottom: calc(env(safe-area-inset-bottom) + 85px);
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            background-color: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            box-shadow: 0 4px 16px rgba(0, 122, 255, 0.4);
+            z-index: 900;
+            cursor: pointer;
+        }
+
+        /* 汎用オーバーレイ（ボトムシート＆詳細モーダル用） */
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            align-items: flex-end;
+            justify-content: center;
+            backdrop-filter: blur(2px);
+        }
+
+        /* 予定の詳細を見るモーダル */
+        #detail-container {
+            background: var(--surface);
+            width: 90%;
+            max-width: 400px;
+            padding: 24px;
+            border-radius: 20px;
+            margin-bottom: 20vh;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            transform: scale(0.95);
+            transition: 0.2s;
+            opacity: 0;
+        }
+
+        #detail-overlay.show #detail-container {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        #detail-title {
+            margin: 0 0 8px 0;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        #detail-time {
+            color: #007aff;
+            font-size: 14px;
+            margin-bottom: 16px;
+            font-weight: bold;
+        }
+
+        #detail-memo {
+            background: #f2f2f7;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            white-space: pre-wrap;
+            margin-bottom: 20px;
+            min-height: 40px;
+        }
+
+        /* ボトムシート（入力フォーム） */
+        #form-container {
+            background: var(--surface);
+            width: 100%;
+            max-width: 500px;
+            padding: 20px 24px calc(env(safe-area-inset-bottom) + 24px) 24px;
+            box-sizing: border-box;
+            border-radius: 24px 24px 0 0;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.1, 0.8, 0.2, 1);
+        }
+
+        #form-overlay.show #form-container {
+            transform: translateY(0);
+        }
+
+        .drag-handle {
+            width: 40px;
+            height: 5px;
+            background: #e5e5ea;
+            border-radius: 3px;
+            margin: 0 auto 16px auto;
+        }
+
+        /* 縦並びにして、くっつきを解消 */
+        .input-group {
+            margin-bottom: 16px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 13px;
+            color: #86868b;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+
+        input[type="text"],
+        input[type="datetime-local"],
+        input[type="date"],
+        textarea {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            background: #f2f2f7;
+            border-radius: 12px;
+            box-sizing: border-box;
+            font-size: 16px;
+            outline: none;
+        }
+
+        textarea {
+            resize: none;
+            height: 80px;
+        }
+
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 30px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #e5e5ea;
+            transition: .3s;
+            border-radius: 30px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        input:checked+.slider {
+            background-color: #34c759;
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(20px);
+        }
+
+        .color-palette {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            padding: 0 8px;
+        }
+
+        .color-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: 0.2s;
+        }
+
+        .color-circle.active {
+            transform: scale(1.1);
+            border-color: var(--text-main);
+        }
+
+        .btn-close {
+            width: 100%;
+            padding: 12px;
+            background: #e5e5ea;
+            border: none;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            color: #1c1c1e;
+        }
+
+        button.save {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 14px;
+            font-size: 16px;
+            font-weight: bold;
+            background: var(--primary);
+            color: white;
+            cursor: pointer;
+        }
+    </style>
 </head>
+
 <body>
 
-  <div id="weather-widget-container">
-    <div id="weather-location">📍 札幌エリアの週間天気</div>
-    <div id="weather-widget">☁️ 天気情報を取得中...</div>
-  </div>
-  <div id="loading-spinner">🔄 カレンダーを同期中...</div>
-
-  <div id="calendar-wrapper">
-    <div id='calendar'></div>
-  </div>
-
-  <div class="fab" onclick="openForm()">＋</div>
-
-  <div class="search-wrapper">
-    <div id="inline-search-result">
-      <div id="search-content"></div>
-      <button class="btn-close" style="margin-top:16px;" onclick="document.getElementById('inline-search-result').style.display='none'">閉じる</button>
+    <div id="weather-widget-container">
+        <div id="weather-location">📍 札幌エリアの週間天気</div>
+        <div id="weather-widget">☁️ 天気情報を取得中...</div>
     </div>
-    
-    <div class="search-bar-container">
-      <input type="text" id="main-search" placeholder="AIに質問する..." onkeypress="if(event.key==='Enter') executeAISearch()">
-      <button class="search-btn" onclick="executeAISearch()">✨ AI</button>
+    <div id="loading-spinner">🔄 カレンダーを同期中...</div>
+
+    <div id="calendar-wrapper">
+        <div id='calendar'></div>
     </div>
-  </div>
 
-  <div id="detail-overlay" class="overlay" onclick="closeDetail(event)">
-    <div id="detail-container" onclick="event.stopPropagation()">
-      <h2 id="detail-title">タイトル</h2>
-      <div id="detail-time">時間</div>
-      <label style="font-size:12px; color:#86868b; font-weight:bold;">📝 メモ</label>
-      <div id="detail-memo"></div>
-      <button class="btn-close" onclick="closeDetail()">閉じる</button>
+    <div class="fab" onclick="openForm()">＋</div>
+
+    <div class="search-wrapper">
+        <div id="inline-search-result">
+            <div id="search-content"></div>
+            <button class="btn-close" style="margin-top:16px;"
+                onclick="document.getElementById('inline-search-result').style.display='none'">閉じる</button>
+        </div>
+
+        <div class="search-bar-container">
+            <input type="text" id="main-search" placeholder="AIに質問する..."
+                onkeypress="if(event.key==='Enter') executeAISearch()">
+            <button class="search-btn" onclick="executeAISearch()">✨ AI</button>
+        </div>
     </div>
-  </div>
 
-  <div id="form-overlay" class="overlay" style="align-items: flex-end;" onclick="closeForm(event)">
-    <div id="form-container" onclick="event.stopPropagation()">
-      <div class="drag-handle"></div>
-      
-      <div class="input-group">
-        <label>タイトル</label>
-        <input type="text" id="event-title" placeholder="デート、内見など">
-      </div>
-
-      <div class="toggle-row">
-        <label style="font-size: 16px; font-weight:bold;">終日</label>
-        <label class="toggle-switch"><input type="checkbox" id="all-day-toggle" onchange="toggleAllDay()"><span class="slider"></span></label>
-      </div>
-      
-      <div class="input-group">
-        <label>開始</label>
-        <input type="datetime-local" id="event-start">
-      </div>
-      <div class="input-group">
-        <label>終了</label>
-        <input type="datetime-local" id="event-end">
-      </div>
-
-      <div class="input-group">
-        <label>メモ</label>
-        <textarea id="event-memo" placeholder="詳細や場所などをメモ..."></textarea>
-      </div>
-
-      <label style="display:block; font-size:12px; color:#86868b; font-weight:bold; margin-bottom:8px;">カラー</label>
-      <div class="color-palette">
-        <div class="color-circle active" style="background:#ff3b30;" onclick="selectColor('#ff3b30', this)"></div>
-        <div class="color-circle" style="background:#ff9500;" onclick="selectColor('#ff9500', this)"></div>
-        <div class="color-circle" style="background:#ffcc00;" onclick="selectColor('#ffcc00', this)"></div>
-        <div class="color-circle" style="background:#34c759;" onclick="selectColor('#34c759', this)"></div>
-        <div class="color-circle" style="background:#007aff;" onclick="selectColor('#007aff', this)"></div>
-        <div class="color-circle" style="background:#5856d6;" onclick="selectColor('#5856d6', this)"></div>
-        <div class="color-circle" style="background:#ff2d55;" onclick="selectColor('#ff2d55', this)"></div>
-      </div>
-      <button class="save" onclick="saveEvent()">追加する</button>
+    <div id="detail-overlay" class="overlay" onclick="closeDetail(event)">
+        <div id="detail-container" onclick="event.stopPropagation()">
+            <h2 id="detail-title">タイトル</h2>
+            <div id="detail-time">時間</div>
+            <label style="font-size:12px; color:#86868b; font-weight:bold;">📝 メモ</label>
+            <div id="detail-memo"></div>
+            <button class="btn-close" onclick="closeDetail()">閉じる</button>
+        </div>
     </div>
-  </div>
 
-  <script>
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbyVivCWCgC1JdpM3whiYKVTpFYLjbWchpB9o_5_VJUN_jIiL9P59UVSXSICNL1pb64W/exec'; // ★GASのURLを貼る
-    // ★Google AI Studioで取得したGemini APIキーをここに入れる（空ならデモ動作）
-    const GEMINI_API_KEY = ''; 
+    <div id="form-overlay" class="overlay" style="align-items: flex-end;" onclick="closeForm(event)">
+        <div id="form-container" onclick="event.stopPropagation()">
+            <div class="drag-handle"></div>
 
-    let calendar;
-    let selectedColor = '#ff3b30';
+            <div class="input-group">
+                <label>タイトル</label>
+                <input type="text" id="event-title" placeholder="デート、内見など">
+            </div>
 
-    function selectColor(color, el) {
-      selectedColor = color;
-      document.querySelectorAll('.color-circle').forEach(c => c.classList.remove('active'));
-      el.classList.add('active');
-    }
+            <div class="toggle-row">
+                <label style="font-size: 16px; font-weight:bold;">終日</label>
+                <label class="toggle-switch"><input type="checkbox" id="all-day-toggle" onchange="toggleAllDay()"><span
+                        class="slider"></span></label>
+            </div>
 
-    document.addEventListener('DOMContentLoaded', function() {
-      fetchWeather(); // ② 天気を最初に取得
+            <div class="input-group">
+                <label>開始</label>
+                <input type="datetime-local" id="event-start">
+            </div>
+            <div class="input-group">
+                <label>終了</label>
+                <input type="datetime-local" id="event-end">
+            </div>
 
-      const calendarEl = document.getElementById('calendar');
-      calendar = new FullCalendar.Calendar(calendarEl, {
-        locale: 'ja',
-        headerToolbar: { left: 'prev,next', center: 'title', right: 'dayGridMonth,listWeek' },
-        buttonText: { month: '月', listWeek: '週' },
-        views: {
-          dayGridMonth: { titleFormat: { year: 'numeric', month: '2-digit' } },
-          listWeek: { titleFormat: { year: 'numeric', month: '2-digit', day: '2-digit' } },
-          listDay: { titleFormat: { year: 'numeric', month: '2-digit', day: '2-digit' } }
-        },
-        dayCellContent: function(arg) { return arg.date.getDate(); },
-        initialView: 'dayGridMonth',
-        height: 'auto',
-        aspectRatio: 0.8,
-        eventDisplay: 'block',
-        displayEventTime: false, // 月表示で時間を消す
-        events: GAS_URL,
-        loading: function(isLoading) {
-          document.getElementById('loading-spinner').style.display = isLoading ? 'block' : 'none';
-        },
-        
-        // ④ 月表示の予定をクリックしたら、その日の予定一覧(listDay)へ
-        // ⑤ 日表示(listDay)で予定をクリックしたら、詳細モーダルを開く
-        eventClick: function(info) {
-          const viewType = info.view.type;
-          if (viewType === 'dayGridMonth') {
-            calendar.changeView('listDay', info.event.start);
-          } else {
-            openDetail(info.event);
-          }
-        },
-        
-        // 日付のマスをタップした時の挙動
-        dateClick: function(info) {
-          requestAnimationFrame(() => {
-            calendar.changeView('listDay', info.dateStr);
-          });
+            <div class="input-group">
+                <label>メモ</label>
+                <textarea id="event-memo" placeholder="詳細や場所などをメモ..."></textarea>
+            </div>
+
+            <label
+                style="display:block; font-size:12px; color:#86868b; font-weight:bold; margin-bottom:8px;">カラー</label>
+            <div class="color-palette">
+                <div class="color-circle active" style="background:#ff3b30;" onclick="selectColor('#ff3b30', this)">
+                </div>
+                <div class="color-circle" style="background:#ff9500;" onclick="selectColor('#ff9500', this)"></div>
+                <div class="color-circle" style="background:#ffcc00;" onclick="selectColor('#ffcc00', this)"></div>
+                <div class="color-circle" style="background:#34c759;" onclick="selectColor('#34c759', this)"></div>
+                <div class="color-circle" style="background:#007aff;" onclick="selectColor('#007aff', this)"></div>
+                <div class="color-circle" style="background:#5856d6;" onclick="selectColor('#5856d6', this)"></div>
+                <div class="color-circle" style="background:#ff2d55;" onclick="selectColor('#ff2d55', this)"></div>
+            </div>
+            <button class="save" onclick="saveEvent()">追加する</button>
+        </div>
+    </div>
+
+    <script>
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbyVivCWCgC1JdpM3whiYKVTpFYLjbWchpB9o_5_VJUN_jIiL9P59UVSXSICNL1pb64W/exec'; // ★GASのURLを貼る
+        let calendar;
+        let selectedColor = '#ff3b30';
+        let cachedEvents = null; // ① 予定データを記憶（キャッシュ）するための変数
+
+        function selectColor(color, el) {
+            selectedColor = color;
+            document.querySelectorAll('.color-circle').forEach(c => c.classList.remove('active'));
+            el.classList.add('active');
         }
-      });
-      calendar.render();
 
-      // ヘッダータップで月表示へ戻る
-      document.body.addEventListener('click', function(e) {
-        if (e.target.classList.contains('fc-toolbar-title')) {
-          calendar.changeView('dayGridMonth');
-        }
-      });
-    });
+        document.addEventListener('DOMContentLoaded', function () {
+            fetchWeather();
 
-    // ⑤ 予定の詳細を表示する関数
-    function openDetail(eventObj) {
-      const overlay = document.getElementById('detail-overlay');
-      document.getElementById('detail-title').innerText = eventObj.title;
-      
-      let timeStr = '終日';
-      if (!eventObj.allDay && eventObj.start) {
-        const s = eventObj.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        const e = eventObj.end ? eventObj.end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
-        timeStr = e ? `${s} 〜 ${e}` : s;
-      }
-      document.getElementById('detail-time').innerText = timeStr;
-      
-      // メモを表示
-      const memo = eventObj.extendedProps.memo || 'メモはありません';
-      document.getElementById('detail-memo').innerText = memo;
+            const calendarEl = document.getElementById('calendar');
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                locale: 'ja',
+                headerToolbar: { left: 'prev,next', center: 'title', right: 'dayGridMonth,listWeek' },
+                buttonText: { month: '月', listWeek: '週' },
+                views: {
+                    dayGridMonth: { titleFormat: { year: 'numeric', month: '2-digit' } },
+                    listWeek: { titleFormat: { year: 'numeric', month: '2-digit', day: '2-digit' } },
+                    listDay: { titleFormat: { year: 'numeric', month: '2-digit', day: '2-digit' } }
+                },
+                dayCellContent: function (arg) { return arg.date.getDate(); },
+                initialView: 'dayGridMonth',
+                height: 'auto',
+                aspectRatio: 0.8,
+                eventDisplay: 'block',
+                displayEventTime: false,
 
-      overlay.style.display = 'flex';
-      setTimeout(() => overlay.classList.add('show'), 10);
-    }
+                // ① 初回だけ通信してデータを取得する仕組み
+                events: function (fetchInfo, successCallback, failureCallback) {
+                    if (cachedEvents) {
+                        // 既に記憶しているデータがあれば、通信せずにそれを表示する
+                        successCallback(cachedEvents);
+                        return;
+                    }
+                    document.getElementById('loading-spinner').style.display = 'block';
+                    fetch(GAS_URL)
+                        .then(res => res.json())
+                        .then(data => {
+                            cachedEvents = data;
+                            successCallback(data);
+                            document.getElementById('loading-spinner').style.display = 'none';
+                        })
+                        .catch(err => {
+                            document.getElementById('loading-spinner').style.display = 'none';
+                            failureCallback(err);
+                        });
+                },
 
-    function closeDetail(e) {
-      if (e && e.target !== document.getElementById('detail-overlay')) return;
-      const overlay = document.getElementById('detail-overlay');
-      overlay.classList.remove('show');
-      setTimeout(() => overlay.style.display = 'none', 200);
-    }
+                eventClick: function (info) {
+                    const viewType = info.view.type;
+                    if (viewType === 'dayGridMonth') {
+                        calendar.changeView('listDay', info.event.start);
+                    } else {
+                        openDetail(info.event);
+                    }
+                },
+                dateClick: function (info) {
+                    requestAnimationFrame(() => {
+                        calendar.changeView('listDay', info.dateStr);
+                    });
+                }
+            });
+            calendar.render();
 
-    // ① AI検索機能（Gemini API連携）
-    async function executeAISearch() {
-      const query = document.getElementById('main-search').value.trim();
-      if (!query) return;
-      
-      document.getElementById('main-search').blur();
-      const resultBox = document.getElementById('inline-search-result');
-      const content = document.getElementById('search-content');
-      
-      resultBox.style.display = 'block';
-      content.innerHTML = '✨ AIが考えています...';
+            // ヘッダータップで月表示へ戻る
+            document.body.addEventListener('click', function (e) {
+                if (e.target.classList.contains('fc-toolbar-title')) {
+                    calendar.changeView('dayGridMonth');
+                }
+            });
 
-      if (!GEMINI_API_KEY) {
-        // APIキーがない場合のデモ動作
-        setTimeout(() => {
-          content.innerHTML = `<strong>「${query}」について</strong><br><br>APIキーが設定されていないため、AIのデモ回答を表示しています。<br>本当のAIを使うにはソース内の「GEMINI_API_KEY」にキーを設定してください！`;
-        }, 1000);
-        return;
-      }
+            // ② 横スワイプで月を切り替える処理
+            let touchStartX = 0;
+            let touchStartY = 0;
+            const wrapperEl = document.getElementById('calendar-wrapper');
 
-      // Gemini APIを叩く処理
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-        const requestBody = {
-          contents: [{ parts: [{ text: query + "について、簡潔に200文字以内で教えてください。" }] }]
-        };
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody)
+            wrapperEl.addEventListener('touchstart', e => {
+                touchStartX = e.changedTouches[0].screenX;
+                touchStartY = e.changedTouches[0].screenY;
+            }, { passive: true });
+
+            wrapperEl.addEventListener('touchend', e => {
+                let touchEndX = e.changedTouches[0].screenX;
+                let touchEndY = e.changedTouches[0].screenY;
+                let xDiff = touchStartX - touchEndX;
+                let yDiff = touchStartY - touchEndY;
+
+                // 縦（スクロール）よりも横の移動が大きく、かつ50px以上動かした場合のみ発動
+                if (Math.abs(xDiff) > Math.abs(yDiff) && Math.abs(xDiff) > 50) {
+                    if (xDiff > 0) calendar.next(); // 左スワイプ -> 翌月
+                    else calendar.prev();           // 右スワイプ -> 前月
+                }
+            }, { passive: true });
+
+            // ③ 入力フォームを下にスワイプして閉じる処理
+            const formContainer = document.getElementById('form-container');
+            let sheetStartY = 0;
+            formContainer.addEventListener('touchstart', e => {
+                sheetStartY = e.touches[0].clientY;
+            }, { passive: true });
+            formContainer.addEventListener('touchmove', e => {
+                let currentY = e.touches[0].clientY;
+                if (currentY - sheetStartY > 60) { // 下に60px以上引っ張ったら閉じる
+                    closeForm();
+                }
+            }, { passive: true });
         });
-        const data = await response.json();
-        
-        if (data && data.candidates && data.candidates.length > 0) {
-          const text = data.candidates[0].content.parts[0].text;
-          content.innerHTML = `<strong>✨ AIの回答</strong><br><br>${text.replace(/\n/g, '<br>')}`;
-        } else {
-          content.innerHTML = 'AIからうまく回答を受け取れませんでした。';
+
+        // 予定の詳細モーダル
+        function openDetail(eventObj) {
+            const overlay = document.getElementById('detail-overlay');
+            document.getElementById('detail-title').innerText = eventObj.title;
+            let timeStr = '終日';
+            if (!eventObj.allDay && eventObj.start) {
+                const s = eventObj.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const e = eventObj.end ? eventObj.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                timeStr = e ? `${s} 〜 ${e}` : s;
+            }
+            document.getElementById('detail-time').innerText = timeStr;
+            const memo = eventObj.extendedProps.memo || 'メモはありません';
+            document.getElementById('detail-memo').innerText = memo;
+            overlay.style.display = 'flex';
+            setTimeout(() => overlay.classList.add('show'), 10);
         }
-      } catch (err) {
-        content.innerHTML = 'エラーが発生しました。ネットワークやAPIキーを確認してください。';
-      }
-    }
 
-    // ② 天気取得
-    async function fetchWeather() {
-      try {
-        const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=43.0642&longitude=141.3469&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo');
-        const data = await res.json();
-        const widget = document.getElementById('weather-widget');
-        const days = ['日', '月', '火', '水', '木', '金', '土'];
-        let html = '';
-        for(let i = 0; i < 7; i++) {
-          const date = new Date(data.daily.time[i]);
-          const dayStr = i === 0 ? '今日' : days[date.getDay()];
-          const code = data.daily.weathercode[i];
-          const max = Math.round(data.daily.temperature_2m_max[i]);
-          const min = Math.round(data.daily.temperature_2m_min[i]);
-          let emoji = '☀️';
-          if(code >= 1 && code <= 3) emoji = '☁️';
-          if(code >= 45 && code <= 48) emoji = '🌫️';
-          if(code >= 51 && code <= 67) emoji = '🌧️';
-          if(code >= 71 && code <= 77) emoji = '❄️';
-          if(code >= 80 && code <= 82) emoji = '☔';
-          if(code >= 85 && code <= 86) emoji = '🌨️';
-          if(code >= 95) emoji = '⛈️';
-          html += `<div class="weather-day"><div class="w-day">${dayStr}</div><div class="w-icon">${emoji}</div><div class="w-temp"><span class="max">${max}°</span><span class="min">${min}°</span></div></div>`;
+        function closeDetail(e) {
+            if (e && e.target !== document.getElementById('detail-overlay')) return;
+            const overlay = document.getElementById('detail-overlay');
+            overlay.classList.remove('show');
+            setTimeout(() => overlay.style.display = 'none', 200);
         }
-        widget.innerHTML = html;
-      } catch (err) {
-        document.getElementById('weather-widget').innerHTML = '⚠️ 天気の取得に失敗しました';
-      }
-    }
 
-    function toggleAllDay() {
-      const isAllDay = document.getElementById('all-day-toggle').checked;
-      const startInput = document.getElementById('event-start');
-      const endInput = document.getElementById('event-end');
-      const currentStart = startInput.value;
-      const currentEnd = endInput.value;
-      if (isAllDay) {
-        startInput.type = 'date'; endInput.type = 'date';
-        startInput.value = currentStart ? currentStart.split('T')[0] : '';
-        endInput.value = currentEnd ? currentEnd.split('T')[0] : '';
-      } else {
-        startInput.type = 'datetime-local'; endInput.type = 'datetime-local';
-        startInput.value = currentStart ? currentStart + 'T12:00' : '';
-        endInput.value = currentEnd ? currentEnd + 'T13:00' : '';
-      }
-    }
+        // AI検索機能（GAS経由）
+        async function executeAISearch() {
+            const query = document.getElementById('main-search').value.trim();
+            if (!query) return;
+            document.getElementById('main-search').blur();
+            const resultBox = document.getElementById('inline-search-result');
+            const content = document.getElementById('search-content');
+            resultBox.style.display = 'block';
+            content.innerHTML = '✨ AIが考えています...';
 
-    function openForm() {
-      const overlay = document.getElementById('form-overlay');
-      overlay.style.display = 'flex';
-      setTimeout(() => overlay.classList.add('show'), 10);
-      document.getElementById('all-day-toggle').checked = false;
-      document.getElementById('event-start').type = 'datetime-local';
-      document.getElementById('event-end').type = 'datetime-local';
-      
-      // デフォルトを現在開いている日付にする
-      let baseDate = calendar.getDate(); 
-      let now = new Date();
-      baseDate.setHours(now.getHours() + 1); 
-      baseDate.setMinutes(0);
-      
-      const startStr = new Date(baseDate.getTime() - (baseDate.getTimezoneOffset() * 60000)).toISOString().substring(0, 16);
-      document.getElementById('event-start').value = startStr;
-      let endDate = new Date(baseDate); endDate.setHours(endDate.getHours() + 1);
-      const endStr = new Date(endDate.getTime() - (endDate.getTimezoneOffset() * 60000)).toISOString().substring(0, 16);
-      document.getElementById('event-end').value = endStr;
-      
-      document.getElementById('event-memo').value = ''; // メモをリセット
-    }
+            try {
+                const response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({ action: 'ai_search', query: query })
+                });
+                const data = await response.json();
 
-    function closeForm(e) {
-      if (e && e.target !== document.getElementById('form-overlay')) return;
-      const overlay = document.getElementById('form-overlay');
-      overlay.classList.remove('show');
-      setTimeout(() => { overlay.style.display = 'none'; document.getElementById('event-title').value = ''; }, 300);
-    }
+                if (data && data.status === 'success') {
+                    content.innerHTML = `<strong>✨ AIの回答</strong><br><br>${data.text.replace(/\n/g, '<br>')}`;
+                } else {
+                    content.innerHTML = 'AIからうまく回答を受け取れませんでした。';
+                }
+            } catch (err) {
+                content.innerHTML = 'エラーが発生しました。ネットワーク接続を確認してください。';
+            }
+        }
 
-    function saveEvent() {
-      const title = document.getElementById('event-title').value;
-      const start = document.getElementById('event-start').value;
-      let end = document.getElementById('event-end').value;
-      const memo = document.getElementById('event-memo').value.replace(/\n/g, ' '); // ⑥ メモを取得（改行はスペース化）
-      const isAllDay = document.getElementById('all-day-toggle').checked;
-      
-      if (!title || !start || !end) return alert('入力してください');
+        // 天気取得
+        async function fetchWeather() {
+            try {
+                const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=43.0642&longitude=141.3469&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto');
+                if (!res.ok) throw new Error('API Error');
+                const data = await res.json();
+                const widget = document.getElementById('weather-widget');
+                const days = ['日', '月', '火', '水', '木', '金', '土'];
+                let html = '';
+                for (let i = 0; i < 7; i++) {
+                    const date = new Date(data.daily.time[i]);
+                    const dayStr = i === 0 ? '今日' : days[date.getDay()];
+                    const code = data.daily.weathercode[i];
+                    const max = Math.round(data.daily.temperature_2m_max[i]);
+                    const min = Math.round(data.daily.temperature_2m_min[i]);
+                    let emoji = '☀️';
+                    if (code >= 1 && code <= 3) emoji = '☁️';
+                    if (code >= 45 && code <= 48) emoji = '🌫️';
+                    if (code >= 51 && code <= 67) emoji = '🌧️';
+                    if (code >= 71 && code <= 77) emoji = '❄️';
+                    if (code >= 80 && code <= 82) emoji = '☔';
+                    if (code >= 85 && code <= 86) emoji = '🌨️';
+                    if (code >= 95) emoji = '⛈️';
+                    html += `<div class="weather-day"><div class="w-day">${dayStr}</div><div class="w-icon">${emoji}</div><div class="w-temp"><span class="max">${max}°</span><span class="min">${min}°</span></div></div>`;
+                }
+                widget.innerHTML = html;
+            } catch (err) {
+                document.getElementById('weather-widget').innerHTML = '⚠️ 天気の取得に失敗しました';
+            }
+        }
 
-      let adjustedEnd = end;
-      if (isAllDay) {
-        let endDate = new Date(end); endDate.setDate(endDate.getDate() + 1);
-        adjustedEnd = endDate.toISOString().split('T')[0];
-      }
-      
-      const payload = { title: title, start: start, end: adjustedEnd, color: selectedColor, allDay: isAllDay, memo: memo };
+        function toggleAllDay() {
+            const isAllDay = document.getElementById('all-day-toggle').checked;
+            const startInput = document.getElementById('event-start');
+            const endInput = document.getElementById('event-end');
+            const currentStart = startInput.value;
+            const currentEnd = endInput.value;
+            if (isAllDay) {
+                startInput.type = 'date'; endInput.type = 'date';
+                startInput.value = currentStart ? currentStart.split('T')[0] : '';
+                endInput.value = currentEnd ? currentEnd.split('T')[0] : '';
+            } else {
+                startInput.type = 'datetime-local'; endInput.type = 'datetime-local';
+                startInput.value = currentStart ? currentStart + 'T12:00' : '';
+                endInput.value = currentEnd ? currentEnd + 'T13:00' : '';
+            }
+        }
 
-      const tempEvent = calendar.addEvent({
-        id: 'temp-' + Date.now(), title: title, start: start, end: adjustedEnd, allDay: isAllDay, backgroundColor: selectedColor, borderColor: selectedColor,
-        extendedProps: { memo: memo }
-      }); 
-      closeForm();
+        function openForm() {
+            const overlay = document.getElementById('form-overlay');
+            overlay.style.display = 'flex';
+            setTimeout(() => overlay.classList.add('show'), 10);
+            document.getElementById('all-day-toggle').checked = false;
+            document.getElementById('event-start').type = 'datetime-local';
+            document.getElementById('event-end').type = 'datetime-local';
 
-      fetch(GAS_URL, {
-        method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload)
-      }).then(() => {
-        tempEvent.remove(); 
-        calendar.refetchEvents();
-      });
-    }
-  </script>
+            let baseDate = calendar.getDate();
+            let now = new Date();
+            baseDate.setHours(now.getHours() + 1);
+            baseDate.setMinutes(0);
+
+            const startStr = new Date(baseDate.getTime() - (baseDate.getTimezoneOffset() * 60000)).toISOString().substring(0, 16);
+            document.getElementById('event-start').value = startStr;
+            let endDate = new Date(baseDate); endDate.setHours(endDate.getHours() + 1);
+            const endStr = new Date(endDate.getTime() - (endDate.getTimezoneOffset() * 60000)).toISOString().substring(0, 16);
+            document.getElementById('event-end').value = endStr;
+            document.getElementById('event-memo').value = '';
+        }
+
+        // ③ 背景タップや下スワイプで閉じる処理
+        function closeForm(e) {
+            // フォームの入力欄などをタップした時は閉じないようにする
+            if (e && e.type === 'click' && e.target !== document.getElementById('form-overlay')) return;
+
+            const overlay = document.getElementById('form-overlay');
+            overlay.classList.remove('show');
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                document.getElementById('event-title').value = '';
+            }, 300);
+        }
+
+        function saveEvent() {
+            const title = document.getElementById('event-title').value;
+            const start = document.getElementById('event-start').value;
+            let end = document.getElementById('event-end').value;
+            const memo = document.getElementById('event-memo').value.replace(/\n/g, ' ');
+            const isAllDay = document.getElementById('all-day-toggle').checked;
+
+            if (!title || !start || !end) return alert('入力してください');
+
+            let adjustedEnd = end;
+            if (isAllDay) {
+                let endDate = new Date(end); endDate.setDate(endDate.getDate() + 1);
+                adjustedEnd = endDate.toISOString().split('T')[0];
+            }
+
+            const payload = { title: title, start: start, end: adjustedEnd, color: selectedColor, allDay: isAllDay, memo: memo };
+
+            const tempEvent = calendar.addEvent({
+                id: 'temp-' + Date.now(), title: title, start: start, end: adjustedEnd, allDay: isAllDay, backgroundColor: selectedColor, borderColor: selectedColor,
+                extendedProps: { memo: memo }
+            });
+            closeForm();
+
+            fetch(GAS_URL, {
+                method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload)
+            }).then(() => {
+                tempEvent.remove();
+                cachedEvents = null; // ① 保存したらキャッシュをリセットして最新を取得させる
+                calendar.refetchEvents();
+            });
+        }
+    </script>
 </body>
+
 </html>
